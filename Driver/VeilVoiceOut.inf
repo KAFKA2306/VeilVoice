@@ -1,0 +1,18 @@
+[Version]
+Signature="$Windows NT$"
+Class=MEDIA
+ClassGuid={4d36e96c-e325-11ce-bfc1-08002be10318}
+Provider=%ProviderName%
+DriverVer=05/13/2026,1.0.0.0
+CatalogFile=VeilVoiceOut.cat
+
+[Manufacturer]
+%ManufacturerName%=Standard,NTamd64
+
+[Standard.NTamd64]
+%DeviceDescription%=VeilVoiceOut_Device, Root\VeilVoiceOut
+
+[Strings]
+ProviderName="VeilVoice Team"
+ManufacturerName="VeilVoice"
+DeviceDescription="VeilVoiceOut Virtual Audio Device"
