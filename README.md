@@ -1,25 +1,26 @@
 # VEILVOICE
 
-# EXECUTABLE DELIVERY & ACCEPTANCE CONTRACT
+# BEATRICE-LOCKED EXECUTABLE DELIVERY & ACCEPTANCE CONTRACT
 
-# VERSION 1.0
+# VERSION 2.0
 
 本契約は、
-「AIリアルタイムボイスチェンジャー VeilVoice」
-の納入条件、検証条件、完成定義を規定する。
-
-本契約は「努力義務」ではない。
+「Beatrice を使用したローカルリアルタイムAIボイスチェンジャー VeilVoice」
+の完成定義、納入条件、検証条件、禁止事項を規定する。
 
 本契約は：
 
-* 実機動作
-* 再現可能性
-* 自動検証
-* 証拠生成
-* Windows統合
-* 音声安全性
+* 仕様書
+* 宣伝文
+* 設計意図
 
-を含む「完成保証契約」である。
+ではない。
+
+本契約は：
+
+「機械検証可能な完成保証契約」
+
+である。
 
 ---
 
@@ -30,14 +31,30 @@
 ## PRODUCT
 
 VeilVoice:
-リアルタイム音声変換アプリケーション。
+Beatrice inference engine を利用し、
+Windows 11 上でリアルタイム音声変換を行う
+ローカルネイティブアプリケーション。
+
+## MANDATORY ENGINE
+
+使用可能 engine：
+
+* Beatrice
+* Beatrice JVS Corpus Edition
+* Beatrice v2
+
+禁止：
+
+* RVC substitution
+* OpenVoice substitution
+* so-vits-svc substitution
+* cloud inference substitution
+* external realtime API substitution
 
 ## TARGET PLATFORM
 
 * Windows 11 24H2
 * x64
-* 日本語環境
-* 英語環境
 
 ## TARGET INPUT DEVICE
 
@@ -46,7 +63,6 @@ VeilVoice:
 ## TARGET OUTPUT DEVICE
 
 * VeilVoiceOut
-* Windows Recording Endpoint
 
 ## TARGET APPLICATIONS
 
@@ -67,36 +83,40 @@ LLM、人間、開発者の発言は、
 
 ## PRINCIPLE-002
 
-以下のみ有効証拠とする：
+以下のみ有効証拠：
 
-* acceptance_runner.exe 出力
-* 自動生成artifact
-* hash付き成果物
-* 実録音wav
-* endpoint列挙結果
-* JSON logs
+* acceptance_runner.exe
 * CI results
-* crash dumps
+* generated artifacts
+* signed logs
+* endpoint enumeration
+* wav recordings
+* binary hash manifests
+* process module dumps
 
 ## PRINCIPLE-003
 
-PASSは、
-機械検証済みartifactが存在する場合のみ成立。
+証拠欠落時、
+必ず UNVERIFIED。
 
 ## PRINCIPLE-004
 
-証拠欠落時、
-必ず UNVERIFIED とする。
+PASSは：
+
+* reproducible
+* hashed
+* machine generated
+
+であること。
 
 ## PRINCIPLE-005
 
 以下は禁止：
 
+* “ほぼ完成”
 * “動くはず”
-* “設計上問題ない”
 * “コードレビュー済み”
-* “実質完成”
-* “ほぼOK”
+* “理論上OK”
 * “再現できないがPASS”
 
 ---
@@ -107,111 +127,232 @@ PASSは、
 
 納入対象：
 
-* VeilVoice application
-* signed installer
-* virtual audio driver
+* VeilVoiceInstaller.exe
+* VeilVoice.exe
+* VeilVoice virtual audio driver
 * acceptance_runner.exe
-* CI configuration
-* automated verification scripts
 * uninstall utility
 * crash recovery subsystem
 * realtime logging subsystem
+* CI verification pipeline
+* reproducibility manifest
 
 ---
 
 # SECTION 3
+
+# ENGINE IDENTITY GUARANTEE
+
+## TEST-ENGINE-001
+
+Requirement:
+VeilVoice が Beatrice engine を使用すること。
+
+Artifacts:
+
+* engine_manifest.json
+* loaded_modules.txt
+* inference_backend_log.txt
+* process_memory_map.txt
+
+PASS:
+
+engine_manifest.json:
+
+```json id="4apxwl"
+{
+  "engine": "Beatrice",
+  "execution_mode": "local_realtime",
+  "runtime": "native"
+}
+```
+
+loaded_modules.txt に：
+
+* beatrice
+* onnxruntime
+* torch
+
+のいずれか存在。
+
+FAIL:
+
+* RVC detected
+* OpenVoice detected
+* external inference API detected
+* remote inference detected
+
+UNVERIFIED:
+
+* module dump missing
+* process inspection failed
+
+---
+
+# SECTION 4
+
+# OFFLINE GUARANTEE
+
+## TEST-OFFLINE-001
+
+Requirement:
+インターネット接続無しで動作可能。
+
+Test Method:
+NIC disabled environment.
+
+Artifacts:
+
+* offline_boot_log.txt
+* network_access_log.txt
+* firewall_trace.json
+
+PASS:
+
+* inference operational offline
+* no auth dependency
+* no cloud endpoint required
+
+FAIL:
+
+* startup blocked
+* cloud auth required
+* runtime API dependency exists
+
+---
+
+# SECTION 5
+
+# CPU REALTIME GUARANTEE
+
+## TEST-CPU-001
+
+Requirement:
+GPU無し realtime inference 可能。
+
+Environment:
+Ryzen 7 5800X baseline.
+
+Artifacts:
+
+* inference_timing.csv
+* realtime_factor.json
+* cpu_usage.csv
+
+PASS:
+
+* realtime_factor >= 1.0
+* avg_cpu <= 30%
+* no GPU required
+
+FAIL:
+
+* GPU mandatory
+* realtime impossible
+
+---
+
+# SECTION 6
+
+# MODEL INTEGRITY GUARANTEE
+
+## TEST-MODEL-001
+
+Requirement:
+使用モデル固定。
+
+Artifacts:
+
+* model_hash_manifest.json
+* loaded_model_log.txt
+
+PASS:
+
+SHA256一致。
+
+FAIL:
+
+* unknown model
+* dynamic redownload
+* model replacement
+
+---
+
+# SECTION 7
 
 # BOOTSTRAP GUARANTEE
 
 ## TEST-BOOTSTRAP-001
 
 Requirement:
-Windows初心者が、
-15分以内にVC可能状態へ到達できること。
+Windows初心者が15分以内導入可能。
 
-禁止事項：
+禁止：
 
 * VoiceMeeter要求
-* VB-CABLE手動設定
+* VB-CABLE要求
 * REAPER要求
-* PowerShell操作要求
-* WDKインストール要求
-* registry手編集
-* endpoint GUID編集
-* Windows既定変更要求
-
-PASS条件：
-
-* installer起動のみで利用開始
-* FIFINE mic自動検出
-* VeilVoiceOut自動生成
-* Discord入力選択可能
+* PowerShell要求
+* manual routing
 
 Artifacts:
 
-* install_log.txt
 * install_duration.json
 * bootstrap_capture.mp4
 * endpoint_after_install.json
 
+PASS:
+
+* installer only
+* auto routing success
+* VeilVoiceOut available
+
 FAIL:
 
-* reboot mandatory
+* reboot required
 * manual routing required
-* PowerShell required
 
 ---
 
-# SECTION 4
+# SECTION 8
 
 # INPUT DEVICE GUARANTEE
 
 ## TEST-INPUT-001
 
 Requirement:
-FIFINE microphone を自動入力として使用。
-
-PASS:
-
-selected_input_device.json:
-
-```json id="8r8y0z"
-{
-  "device_name": "FIFINE ..."
-}
-```
+FIFINE mic 自動認識。
 
 Artifacts:
 
 * input_endpoint_list.json
 * selected_input_device.json
-* initialization_log.txt
+
+PASS:
+
+selected_input_device.json:
+
+```json id="pyr2p2"
+{
+  "device_name": "FIFINE ..."
+}
+```
 
 FAIL:
 
 * unknown mic selected
-* manual selection required
+* manual device selection required
 
 ---
 
-# SECTION 5
+# SECTION 9
 
-# VIRTUAL MIC GUARANTEE
+# OUTPUT DEVICE GUARANTEE
 
 ## TEST-VMIC-001
 
 Requirement:
-VeilVoiceOut endpoint が生成されること。
-
-PASS:
-
-virtual_endpoint_list.json:
-
-```json id="zw8lbm"
-{
-  "endpoint_name": "VeilVoiceOut"
-}
-```
+VeilVoiceOut endpoint 生成。
 
 Artifacts:
 
@@ -219,50 +360,52 @@ Artifacts:
 * veilvoiceout_guid.txt
 * windows_recording_devices.png
 
+PASS:
+
+endpoint visible.
+
 FAIL:
 
 * endpoint absent
 * VB-CABLE visible
-* VoiceMeeter exposed
+* VoiceMeeter visible
 
 ---
 
-# SECTION 6
+# SECTION 10
 
 # DISCORD GUARANTEE
 
 ## TEST-DISCORD-001
 
 Requirement:
-Discord Stable にて入力デバイスとして使用可能。
-
-PASS:
-
-* Discord input list contains VeilVoiceOut
-* Discord input meter reacts
+Discord Stable compatible.
 
 Artifacts:
 
 * discord_capture.png
 * discord_meter_capture.png
-* discord_endpoint_log.json
+
+PASS:
+
+* VeilVoiceOut selectable
+* meter active
 
 FAIL:
 
-* Discord restart required
+* restart required
 * endpoint invisible
-* default device dependency
 
 ---
 
-# SECTION 7
+# SECTION 11
 
 # VRCHAT GUARANTEE
 
 ## TEST-VRCHAT-001
 
 Requirement:
-VRChat microphone inputとして利用可能。
+VRChat compatible.
 
 Artifacts:
 
@@ -271,25 +414,19 @@ Artifacts:
 
 FAIL:
 
-* no mic detected
+* mic unavailable
 * crash occurs
 
 ---
 
-# SECTION 8
+# SECTION 12
 
 # RAW VOICE LEAK PREVENTION
 
 ## TEST-PRIVACY-001
 
 Requirement:
-生声がVCへ流出しない。
-
-PASS:
-
-* processed voice exists
-* raw voice absent
-* mute outputs silence
+生声流出禁止。
 
 Artifacts:
 
@@ -298,6 +435,11 @@ Artifacts:
 * muted_output.wav
 * correlation_metrics.json
 
+PASS:
+
+* processed voice only
+* mute outputs silence
+
 FAIL:
 
 * raw mic audible
@@ -305,7 +447,7 @@ FAIL:
 
 ---
 
-# SECTION 9
+# SECTION 13
 
 # LATENCY GUARANTEE
 
@@ -325,44 +467,42 @@ FAIL:
 
 ---
 
-# SECTION 10
+# SECTION 14
 
 # LONGRUN STABILITY
 
 ## TEST-STABILITY-001
 
 Requirement:
-3時間以上安定動作。
+3時間安定動作。
 
 Artifacts:
 
 * cpu_metrics.csv
 * memory_metrics.csv
 * dropout_log.txt
-* audio_crc_log.txt
 
 FAIL:
 
 * freeze
-* unrecovered dropout
-* audio corruption
 * memory leak
+* unrecovered dropout
 
 ---
 
-# SECTION 11
+# SECTION 15
 
-# DEVICE HOTPLUG
+# HOTPLUG GUARANTEE
 
 ## TEST-HOTPLUG-001
 
 Requirement:
-USB抜き差し後5秒以内復旧。
+USB抜き差し復旧 <= 5s
 
 Artifacts:
 
 * reconnect_log.txt
-* device_change_log.txt
+* endpoint_before_after.json
 
 FAIL:
 
@@ -371,59 +511,56 @@ FAIL:
 
 ---
 
-# SECTION 12
+# SECTION 16
 
 # CRASH SAFETY
 
 ## TEST-CRASH-001
 
 Requirement:
-異常終了後もWindows音声環境を破壊しない。
+異常終了後もWindows音声環境維持。
 
 Artifacts:
 
 * crash_dump.dmp
 * endpoint_post_crash.json
-* audio_service_state.json
 
 FAIL:
 
-* audio service broken
-* zombie endpoint remains
+* zombie endpoint
+* audio service corruption
 
 ---
 
-# SECTION 13
+# SECTION 17
 
-# RESOURCE GUARANTEE
+# DRIVER SIGNING GUARANTEE
 
-## TEST-PERF-001
+## TEST-DRIVER-001
 
 Requirement:
-平均CPU使用率30%以下。
-
-Environment:
-Ryzen 7 5800X baseline
+Microsoft署名済みdriver。
 
 Artifacts:
 
-* cpu_usage.csv
-* inference_timing.csv
+* signtool_verify.txt
+* driver_signature_report.txt
 
 FAIL:
 
-* avg_cpu > 30%
+* unsigned driver
+* test signing dependency
 
 ---
 
-# SECTION 14
+# SECTION 18
 
 # CONFIG PERSISTENCE
 
 ## TEST-CONFIG-001
 
 Requirement:
-再起動後も設定保持。
+再起動後設定維持。
 
 Artifacts:
 
@@ -436,14 +573,14 @@ FAIL:
 
 ---
 
-# SECTION 15
+# SECTION 19
 
 # UNINSTALL SAFETY
 
 ## TEST-UNINSTALL-001
 
 Requirement:
-完全アンインストール可能。
+完全アンインストール。
 
 Artifacts:
 
@@ -453,87 +590,30 @@ Artifacts:
 
 FAIL:
 
-* orphan driver remains
-* endpoint zombie remains
-
----
-
-# SECTION 16
-
-# DRIVER REQUIREMENTS
-
-## DRIVER-001
-
-Requirement:
-Virtual audio driver signed.
-
-PASS:
-
-* Microsoft attestation signing valid
-
-Artifacts:
-
-* driver_signature_report.txt
-* signtool_verify.txt
-
-FAIL:
-
-* unsigned driver
-* test mode dependency
-
----
-
-# SECTION 17
-
-# ARTIFACT REQUIREMENTS
-
-全テスト成果物は以下必須：
-
-* timestamp
-* machine_id
-* git_commit
-* app_version
-* artifacts_hash
-* os_version
-
-hash algorithm:
-SHA256
-
----
-
-# SECTION 18
-
-# ACCEPTANCE RUNNER REQUIREMENTS
-
-acceptance_runner.exe は：
-
-* standalone executable
-* no Python dependency
-* deterministic output
-* reproducible execution
-
-であること。
-
----
-
-# SECTION 19
-
-# FINAL DELIVERY BLOCKERS
-
-以下成立時、
-納入禁止：
-
-* FAIL >= 1
-* UNVERIFIED >= 1
-* artifact missing
-* hash mismatch
-* non reproducible result
+* orphan driver
+* orphan service
+* zombie endpoint
 
 ---
 
 # SECTION 20
 
-# FINAL ACCEPTANCE AUTHORITY
+# ARTIFACT INTEGRITY
+
+全artifact必須：
+
+* SHA256
+* timestamp
+* machine_id
+* git_commit
+* app_version
+* os_version
+
+---
+
+# SECTION 21
+
+# ACCEPTANCE AUTHORITY
 
 完成判定主体：
 
@@ -541,15 +621,30 @@ acceptance_runner.exe は：
 * CI pipeline
 * human artifact review
 
-LLMは：
+LLMは禁止：
 
-* 完成判定権限なし
-* PASS宣言権限なし
-* artifact改変権限なし
+* PASS宣言
+* completion宣言
+* artifact生成偽装
 
 ---
 
-# SECTION 21
+# SECTION 22
+
+# DELIVERY BLOCKERS
+
+以下成立時、
+納入禁止：
+
+* FAIL >= 1
+* UNVERIFIED >= 1
+* missing artifact
+* hash mismatch
+* unreproducible execution
+
+---
+
+# SECTION 23
 
 # FINAL DELIVERY PACKAGE
 
@@ -558,31 +653,32 @@ LLMは：
 * VeilVoiceInstaller.exe
 * acceptance_runner.exe
 * acceptance_report.html
-* all logs
-* all artifacts
+* artifacts/*
+* logs/*
 * hashes.sha256
 * CI bundle
-* crash dump bundle
-* reproducibility manifest
 * endpoint GUID report
-* uninstall verification report
+* crash bundle
+* reproducibility manifest
+* model hash manifest
 
 ---
 
-# SECTION 22
+# SECTION 24
 
 # DEFINITION OF COMPLETE
 
-以下すべて成立時のみ：
+以下成立時のみ：
 
 * FAIL == 0
 * UNVERIFIED == 0
-* artifact integrity valid
-* CI reproducible
-* reboot persistence valid
+* Beatrice verified
+* offline verified
+* realtime verified
 * Discord verified
 * VRChat verified
-* raw voice leak absent
+* raw leak absent
+* artifact integrity valid
 
 その時のみ：
 
