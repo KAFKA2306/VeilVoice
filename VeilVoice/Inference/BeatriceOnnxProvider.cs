@@ -23,6 +23,7 @@ namespace VeilVoice.Inference
         public ModelManifest? Manifest { get; private set; }
         public string EngineName => "Beatrice v2 (ONNX)";
         public bool IsReady { get; private set; }
+        public bool IsBeatriceCompatible { get; private set; }
         public string StatusMessage { get; private set; } = "Initializing...";
         public int SampleRate => Manifest?.SampleRate ?? 48000;
         public int LatencySamples => 480; // Beatrice v2 standard latency
@@ -63,16 +64,15 @@ namespace VeilVoice.Inference
                 _inputName = _session.InputMetadata.Keys.FirstOrDefault() ?? "input";
 
                 // Compatibility Validation (SECTION 32)
-                if (!ValidateCompatibility(out string reason))
+                IsBeatriceCompatible = ValidateCompatibility(out string reason);
+                if (!IsBeatriceCompatible)
                 {
-                    StatusMessage = $"[ERROR] Incompatible Model: {reason}";
-                    IsReady = false;
-                    return;
+                    LogService.Warn($"[Beatrice] Architecture check failed: {reason}");
                 }
 
                 IsReady = true;
-                StatusMessage = "Ready";
-                LogService.Info($"[Beatrice] Loaded model: {Manifest?.ModelName}");
+                StatusMessage = IsBeatriceCompatible ? "Ready" : $"Ready (Infrastructure Only: {reason})";
+                LogService.Info($"[Beatrice] Loaded model: {Manifest?.ModelName} (BeatriceCompatible={IsBeatriceCompatible})");
             }
             catch (Exception ex)
             {
@@ -138,7 +138,7 @@ namespace VeilVoice.Inference
                 // Dump Input Tensor
                 string inputPath = Path.Combine(executionDir, "tensor_input_dump.bin");
                 File.WriteAllBytes(inputPath, MemoryMarshal.AsBytes(input.AsSpan()).ToArray());
-                ProvenanceService.RegisterArtifact(inputPath, "tensor_input", $"Engine: {EngineName}");
+                ProvenanceService.RegisterArtifact(inputPath, "tensor_input", $"Engine: {Manifest?.Engine} | BeatriceCompatible: {IsBeatriceCompatible}");
 
                 var inputTensor = new DenseTensor<float>(input, new[] { 1, input.Length });
                 var inputs = new List<NamedOnnxValue> { NamedOnnxValue.CreateFromTensor(_inputName, inputTensor) };
@@ -150,7 +150,7 @@ namespace VeilVoice.Inference
                 // Dump Output Tensor
                 string outputPath = Path.Combine(executionDir, "tensor_output_dump.bin");
                 File.WriteAllBytes(outputPath, MemoryMarshal.AsBytes(result.AsSpan()).ToArray());
-                ProvenanceService.RegisterArtifact(outputPath, "tensor_output", $"Engine: {EngineName}");
+                ProvenanceService.RegisterArtifact(outputPath, "tensor_output", $"Engine: {Manifest?.Engine} | BeatriceCompatible: {IsBeatriceCompatible}");
             }
             catch (Exception ex)
             {

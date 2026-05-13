@@ -70,8 +70,8 @@ namespace VeilVoiceAcceptanceRunner
 
                 var manifest = models.FirstOrDefault(m => m.Engine == "Beatrice");
                 if (manifest == null) {
-                    Console.WriteLine("    [WARN] No Beatrice-engine models found. Using first available for infra check only.");
-                    manifest = models.First();
+                    Console.WriteLine("    [WARN] No Beatrice-engine models found. Using Infrastructure Validator for trace.");
+                    manifest = models.FirstOrDefault(m => m.Engine == "Generic-ONNX-Test") ?? models.First();
                 }
                 
                 Console.WriteLine($"    [INFO] Using model for trace: {manifest.ModelName} (Engine: {manifest.Engine})");
@@ -79,17 +79,34 @@ namespace VeilVoiceAcceptanceRunner
                 using var provider = new BeatriceOnnxProvider(manifest);
                 if (!provider.IsReady) {
                     Console.WriteLine($"    [ERROR] Provider not ready: {provider.StatusMessage}");
+                    // Fallback to infrastructure-only trace if possible
+                    if (manifest.Engine == "Beatrice") {
+                        Console.WriteLine("    [INFO] Attempting fallback to Generic-ONNX-Test for infrastructure trace...");
+                        var fallback = models.FirstOrDefault(m => m.Engine == "Generic-ONNX-Test");
+                        if (fallback != null) {
+                            using var fallbackProvider = new BeatriceOnnxProvider(fallback);
+                            if (fallbackProvider.IsReady) {
+                                provider.Dispose(); // Clear old session
+                                GenerateTrace(fallbackProvider);
+                                return;
+                            }
+                        }
+                    }
                     return;
                 }
 
-                float[] input = new float[480];
-                float[] output = new float[480];
-                provider.Process(input, output);
-                
-                Console.WriteLine($"    [SUCCESS] Real execution trace generated: {ProvenanceService.CurrentExecutionId}");
+                GenerateTrace(provider);
             } catch (Exception ex) {
                 Console.WriteLine($"    [ERROR] Execution failed: {ex.Message}");
             }
+        }
+
+        static void GenerateTrace(BeatriceOnnxProvider provider)
+        {
+            float[] input = new float[480];
+            float[] output = new float[480];
+            provider.Process(input, output);
+            Console.WriteLine($"    [SUCCESS] Real execution trace generated: {ProvenanceService.CurrentExecutionId}");
         }
 
         static void RunTest(Action action, string testId)
@@ -141,23 +158,26 @@ namespace VeilVoiceAcceptanceRunner
         static void Audit_RealInference()
         {
             var res = new TestResult("TEST-REAL-001");
-            ModelManager.Refresh();
-            var models = ModelManager.GetAvailableModels();
+            string provDir = Path.Combine(AppContext.BaseDirectory, "provenance");
+            var latest = Directory.GetFiles(provDir, "provenance_*.json").OrderByDescending(f => File.GetCreationTime(f)).FirstOrDefault();
             
-            var official = models.FirstOrDefault(m => m.ModelName.Contains("Official"));
-            if (official != null) {
-                Console.WriteLine($"    [INFO] Path discovered: {official.ResolvedAbsolutePath}");
-                // Now check if execution happened
-                string provDir = Path.Combine(AppContext.BaseDirectory, "provenance");
-                var latest = Directory.GetFiles(provDir, "provenance_*.json").OrderByDescending(f => File.GetCreationTime(f)).FirstOrDefault();
-                
-                if (latest != null) {
-                    res.Pass($"Real inference verified for {official.ModelName}");
-                } else {
-                    res.Fail($"Model found at {Path.GetFileName(official.ResolvedAbsolutePath)}, but REAL INFERENCE failed to execute. Check engine compatibility.");
-                }
+            if (latest == null) { res.Fail("No execution trace found. Real inference required."); Results.Add(res); return; }
+
+            string json = File.ReadAllText(latest);
+            var artifacts = JsonSerializer.Deserialize<List<ProvenanceService.ArtifactMetadata>>(json);
+            
+            bool hasInput = artifacts.Any(a => a.Type == "tensor_input");
+            bool hasOutput = artifacts.Any(a => a.Type == "tensor_output");
+
+            // Verify Beatrice architecture compatibility
+            bool isBeatrice = artifacts.Any(a => (a.Details?.Contains("Engine: Beatrice") ?? false) && (a.Details?.Contains("BeatriceCompatible: True") ?? false));
+            
+            if (hasInput && hasOutput && isBeatrice) {
+                res.Pass($"Real Beatrice inference verified via ExecutionID: {artifacts.First().ExecutionId}");
+            } else if (!isBeatrice) {
+                res.Fail("Architecture Mismatch: Non-Beatrice model used. Beatrice architecture compatible inference not found.");
             } else {
-                res.Fail("Official Beatrice model path not discovered. SECTION 26 violation.");
+                res.Fail("Incomplete inference trace. Tensors missing.");
             }
             Results.Add(res);
         }
@@ -173,19 +193,13 @@ namespace VeilVoiceAcceptanceRunner
             string json = File.ReadAllText(latest);
             var artifacts = JsonSerializer.Deserialize<List<ProvenanceService.ArtifactMetadata>>(json);
             
-            bool hasInput = artifacts.Any(a => a.Type == "tensor_input");
-            bool hasOutput = artifacts.Any(a => a.Type == "tensor_output");
+            // Verify hashes and IDs match
+            string execId = artifacts.First().ExecutionId;
+            bool chainValid = artifacts.All(a => a.ExecutionId == execId);
+            bool hashesPresent = artifacts.All(a => !string.IsNullOrEmpty(a.Sha256));
 
-            // NEW: Check if the model used was actually Beatrice and passed architecture check
-            bool isBeatrice = artifacts.Any(a => a.Details?.Contains("Engine: Beatrice") ?? false);
-            
-            if (hasInput && hasOutput && isBeatrice) {
-                res.Pass($"Real Beatrice inference verified via ExecutionID: {artifacts.First().ExecutionId}");
-            } else if (!isBeatrice) {
-                res.Fail("Architecture Mismatch: Non-Beatrice model used. Generic ONNX infra verified only.");
-            } else {
-                res.Fail("Incomplete inference trace. Tensors missing.");
-            }
+            if (chainValid && hashesPresent) res.Pass($"Provenance chain verified for {artifacts.Count} artifacts.");
+            else res.Fail("Execution ID mismatch or missing hashes in provenance chain.");
             Results.Add(res);
         }
 

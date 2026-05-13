@@ -1,46 +1,46 @@
 # VEILVOICE
 
-# CRYPTOGRAPHIC ZERO-TRUST EXECUTABLE CONTRACT
+# FINAL ZERO-TRUST DELIVERY CONTRACT
 
-# VERSION 4.0
+# VERSION 5.0
 
 本契約は、
 VeilVoice の：
 
 * 完成定義
-* 実行定義
-* 推論定義
-* Virtual Audio 定義
-* artifact provenance
-* audit chain
-* anti-fake verification
+* runtime定義
+* Beatrice integration定義
+* provenance定義
+* virtual audio定義
+* realtime stability定義
+* security定義
+* anti-fake verification定義
 
 を規定する。
 
 本契約は：
 
-「artifact が存在する」
+* 善意
+* 自己申告
+* completion claim
+* “動くはず”
+* “production ready”
 
-だけでは不十分とする。
+を信用しない。
 
 本契約は：
 
-```text id="uyx2v7"
-artifact provenance
+```text id="v3mf0h"
+reproducible runtime evidence
 ```
 
-すなわち：
-
-「そのartifactが、
-真正な runtime execution から生成された」
-
-ことを要求する。
+のみを信用する。
 
 ---
 
 # SECTION 0
 
-# CORE PHILOSOPHY
+# CORE PRINCIPLES
 
 ## PRINCIPLE-001
 
@@ -48,39 +48,28 @@ LLMは信用されない。
 
 ## PRINCIPLE-002
 
-開発者自己申告は信用されない。
+artifact単体は信用されない。
 
 ## PRINCIPLE-003
 
-artifact単体は信用されない。
+artifact provenance mandatory。
 
 ## PRINCIPLE-004
 
-artifact provenance を mandatory とする。
+PASS判定とartifact生成を分離。
 
 ## PRINCIPLE-005
 
-PASS判定主体と、
-artifact生成主体を分離する。
+FAILを隠す行為は禁止。
 
 ## PRINCIPLE-006
 
-Mock/Fake/Stub/Simulation は：
-
-* source
-* binary
-* runtime
-* validation
-* compatibility
-
-すべて禁止。
+UNVERIFIEDをPASSへ昇格禁止。
 
 ## PRINCIPLE-007
 
-“validation only”
-“simulation only”
-“compatibility mode”
-は禁止。
+runtime未実行状態での
+completion claim禁止。
 
 ---
 
@@ -89,15 +78,17 @@ Mock/Fake/Stub/Simulation は：
 # PRODUCT DEFINITION
 
 VeilVoice:
-Beatrice engine による、
-Windows 11 向け
-local realtime voice conversion application。
+Beatrice engine を利用し、
+Windows 11 上で realtime voice conversion を行う
+local native application。
 
 ---
 
 # SECTION 2
 
-# ALLOWED ENGINE
+# ENGINE REQUIREMENTS
+
+## ALLOWED ENGINE
 
 許可：
 
@@ -111,144 +102,192 @@ local realtime voice conversion application。
 * OpenVoice substitution
 * cloud inference
 * prerecorded output
-* DSP fake conversion
 * compatibility simulation
+* fake inference
 
 ---
 
 # SECTION 3
 
-# REAL EXECUTION REQUIREMENT
+# MODEL FORMAT REQUIREMENTS
+
+## ALLOWED MODEL FORMATS
+
+許可：
+
+* official .bin
+* official .toml
+* official VST3 runtime
+* official native runtime
+* officially compatible ONNX backend
+
+---
+
+## NOT REQUIRED
+
+`.onnx mandatory` を禁止。
+
+---
+
+# SECTION 4
+
+# BACKEND DECLARATION
+
+## REQUIRED FIELD
+
+```json id="fd3sq7"
+{
+  "backend_type": "official_vst3"
+}
+```
+
+---
+
+## ALLOWED BACKENDS
+
+* official_vst3
+* official_native
+* onnx_backend
+
+---
+
+## FORBIDDEN
+
+* hidden backend
+* spoofed backend
+* undeclared dependency
+
+---
+
+# SECTION 5
+
+# REAL EXECUTION REQUIREMENTS
 
 ## TEST-REAL-001
 
 Requirement:
-真正な Beatrice inference mandatory。
+真正 runtime execution mandatory。
 
-真正 inference 定義：
+真正 execution 定義：
 
+```text id="l4h8v6"
 Input Audio
-↓
-Tensor Input
-↓
-Real ONNX Session
-↓
-Tensor Output
-↓
-Generated Audio
+→ Official Beatrice Runtime
+→ Official Model
+→ Tensor Generation
+→ Audio Generation
+→ VeilVoiceOut
+```
 
-が、
-単一 execution trace 内で接続されること。
+が単一 execution trace に存在。
 
 ---
 
 ## REQUIRED ARTIFACTS
 
 * raw_input.wav
+* runtime_execution_id.txt
+* backend_runtime_trace.json
 * tensor_input_dump.bin
-* onnx_session_trace.json
 * tensor_output_dump.bin
 * processed_output.wav
 * inference_timing.csv
-* runtime_execution_id.txt
+* audio_callback_trace.log
 
 ---
 
 ## PASS条件
 
-以下が全成立：
+以下全成立：
 
 1.
 
-ONNX session 実生成。
+official runtime loaded。
 
 2.
 
-real model loaded。
+official model loaded。
 
 3.
 
-tensor output generated。
+real tensor output generated。
 
 4.
 
-processed_output.wav が
-同一 execution_id を持つ。
+real generated audio exists。
 
 5.
 
-runtime_execution_id が：
+execution_id一致。
 
-* input
-* tensor
-* output
-* wav
+6.
 
-全artifactで一致。
+callback starvation absent。
 
 ---
 
 ## FAIL条件
 
-* prerecorded wav
-* fake tensor
-* simulated inference
-* validation-only execution
-* empty ONNX session
-* bypass graph
-* silent fallback
+* simulation mode
 * compatibility-only mode
+* prerecorded output
+* fake tensor
+* bypass inference
+* silent fallback
 
 ---
 
-# SECTION 4
+# SECTION 6
 
-# ARTIFACT PROVENANCE CHAIN
+# PROVENANCE CHAIN
 
 ## TEST-PROVENANCE-001
 
 Requirement:
 全artifact provenance mandatory。
 
-各artifact必須：
+---
+
+## REQUIRED METADATA
 
 * SHA256
 * execution_id
 * timestamp
 * process_id
-* machine_id
+* thread_id
 * git_commit
+* machine_id
 
 ---
 
 ## PASS条件
 
-artifact graph が：
+以下trace成立：
 
-```text id="b2u1pn"
+```text id="a3j9de"
 raw_input.wav
 → tensor_input_dump.bin
-→ ONNX session
+→ runtime execution
 → tensor_output_dump.bin
 → processed_output.wav
+→ VeilVoiceOut
 ```
-
-として接続可能。
 
 ---
 
 ## FAIL条件
 
-* orphan artifact
 * provenance mismatch
-* execution_id mismatch
-* hash mismatch
+* stale artifact reuse
+* execution_id collision
+* orphan artifact
+* replayed wav
 
 ---
 
-# SECTION 5
+# SECTION 7
 
-# FORBIDDEN SYMBOLS
+# FORBIDDEN SYMBOL DETECTION
 
 ## TEST-BINARY-001
 
@@ -265,30 +304,21 @@ raw_input.wav
 
 ---
 
-## PASS条件
-
-forbidden symbol count == 0
-
----
-
 ## FAIL条件
 
-count > 0
+forbidden symbol detected。
 
 ---
 
-# SECTION 6
+# SECTION 8
 
 # SOURCE INTEGRITY
 
 ## TEST-SOURCE-001
 
-Requirement:
-conditional bypass prohibited。
-
 禁止：
 
-```text id="khw6xv"
+```text id="78sh98"
 if (MOCK)
 if (VALIDATION)
 if (SIMULATION)
@@ -298,13 +328,13 @@ if (SIMULATION)
 
 ## FAIL条件
 
-validation branch detected。
+validation branch exists。
 
 ---
 
-# SECTION 7
+# SECTION 9
 
-# VIRTUAL AUDIO DEFINITION
+# VIRTUAL AUDIO REQUIREMENTS
 
 ## TEST-VAUDIO-001
 
@@ -313,26 +343,11 @@ VeilVoiceOut endpoint mandatory。
 
 ---
 
-## OPTION A
+## REQUIRED DISCLOSURE
 
-独自Virtual Audio Driver。
-
----
-
-## OPTION B
-
-署名済み third-party backend。
-
-許可：
-
-* Voicemeeter VAIO
-* VB-CABLE
-
-ただし mandatory：
-
-* dependency disclosure
-* backend identity disclosure
-* endpoint provider disclosure
+* backend identity
+* dependency identity
+* routing topology
 
 ---
 
@@ -341,12 +356,7 @@ VeilVoiceOut endpoint mandatory。
 * endpoint_provider.json
 * driver_stack_dump.txt
 * endpoint_guid_report.json
-
----
-
-## PASS条件
-
-backend identity 明示。
+* routing_topology.json
 
 ---
 
@@ -354,93 +364,36 @@ backend identity 明示。
 
 * hidden dependency
 * backend spoofing
-* fake endpoint naming
-
----
-
-# SECTION 8
-
-# AUDIO GRAPH GUARANTEE
-
-## TEST-GRAPH-001
-
-Requirement:
-
-```text id="6sv2yo"
-Input PCM
-→ Beatrice
-→ VeilVoiceOut
-```
-
-のみ成立。
-
----
-
-## REQUIRED ARTIFACTS
-
-* audio_graph.json
-* runtime_pipeline_trace.log
-
----
-
-## FAIL条件
-
-* raw passthrough
-* bypass graph
-* parallel raw route
-* fallback raw route
-
----
-
-# SECTION 9
-
-# REAL AUDIO VALIDATION
-
-## TEST-AUDIO-001
-
-Requirement:
-processed_output.wav が
-真正推論由来。
-
----
-
-## REQUIRED VALIDATION
-
-* waveform delta
-* spectral difference
-* tensor-output correlation
-* runtime timing consistency
-
----
-
-## FAIL条件
-
-* identical prerecorded pattern
-* static waveform reuse
-* silence substitution
-* fake generated output
+* unstable endpoint GUID
+* fake endpoint provider
 
 ---
 
 # SECTION 10
 
-# DISCORD / VRCHAT
+# REALTIME AUDIO STABILITY
 
-## TEST-DISCORD-001
+## TEST-REALTIME-001
 
-Artifacts:
-
-* discord_capture.png
-* discord_meter_capture.png
+Requirement:
+realtime callback stability。
 
 ---
 
-## TEST-VRCHAT-001
+## REQUIRED
 
-Artifacts:
+* callback timing logs
+* underrun logs
+* overrun logs
+* starvation metrics
 
-* vrchat_capture.png
-* vrchat_audio_log.txt
+---
+
+## FAIL条件
+
+* callback starvation
+* realtime collapse
+* unstable callback timing
 
 ---
 
@@ -451,87 +404,205 @@ Artifacts:
 ## TEST-HOTSWAP-001
 
 Requirement:
-real ONNX session hotswap。
+real runtime hotswap。
 
 ---
 
-## REQUIRED
+## PASS条件
 
-runtime model switch mandatory。
+* official runtime maintained
+* real model switch succeeds
+* no graph corruption
 
 ---
 
 ## FAIL条件
 
-* mock provider swap
-* simulation-only hotswap
-* empty runtime switch
+* mock swap
+* simulation swap
+* callback deadlock
 
 ---
 
 # SECTION 12
 
-# OFFLINE GUARANTEE
+# AUDIO GRAPH VALIDATION
 
-## TEST-OFFLINE-001
+## TEST-GRAPH-001
 
 Requirement:
-完全offline動作。
 
-FAIL：
+```text id="jdfq3x"
+Input PCM
+→ Beatrice Runtime
+→ VeilVoiceOut
+```
 
-* cloud auth
-* runtime API dependency
+のみ成立。
+
+---
+
+## FAIL条件
+
+* raw passthrough
+* bypass graph
+* fallback raw route
+* parallel raw output
 
 ---
 
 # SECTION 13
 
-# LATENCY
+# AUDIO AUTHENTICITY
 
-## TEST-LATENCY-001
+## TEST-AUDIO-001
 
 Requirement:
-p95 < 150ms。
+generated audio authenticity。
+
+---
+
+## REQUIRED VALIDATION
+
+* waveform delta
+* spectral difference
+* runtime timing correlation
+* tensor/audio consistency
+
+---
+
+## FAIL条件
+
+* prerecorded waveform
+* static waveform reuse
+* silence substitution
 
 ---
 
 # SECTION 14
 
-# LONGRUN
+# DISCORD / VRCHAT
 
-## TEST-STABILITY-001
+## TEST-DISCORD-001
 
 Requirement:
-3時間 stable。
+Discord stable operation。
+
+---
+
+## TEST-VRCHAT-001
+
+Requirement:
+VRChat stable operation。
+
+---
+
+## REQUIRED
+
+* reconnect stability
+* sample rate negotiation
+* device persistence
 
 ---
 
 # SECTION 15
 
-# CRASH SAFETY
+# HOTPLUG
 
-## TEST-CRASH-001
+## TEST-HOTPLUG-001
 
-FAIL：
+Requirement:
+USB reconnect <= 5s。
 
-* zombie endpoint
-* audio corruption
+---
+
+## FAIL条件
+
+* reconnect failure
+* endpoint loss
+* callback freeze
 
 ---
 
 # SECTION 16
 
-# DRIVER SIGNING
+# LONGRUN STABILITY
 
-## TEST-DRIVER-001
+## TEST-STABILITY-001
 
 Requirement:
-署名済み。
+3時間 continuous runtime。
+
+---
+
+## REQUIRED VALIDATION
+
+* memory growth
+* callback stability
+* graph consistency
+* no corruption
+
+---
+
+## FAIL条件
+
+* memory leak
+* graph corruption
+* audio corruption
+* deadlock
 
 ---
 
 # SECTION 17
+
+# CRASH SAFETY
+
+## TEST-CRASH-001
+
+Requirement:
+crash isolation。
+
+---
+
+## FAIL条件
+
+* zombie endpoint
+* corrupted audio service
+* persistent graph corruption
+
+---
+
+# SECTION 18
+
+# SECURITY VALIDATION
+
+## TEST-SECURITY-001
+
+Requirement:
+security hardening。
+
+---
+
+## REQUIRED TESTS
+
+* malformed manifest
+* path traversal
+* symlink attack
+* DLL injection
+* runtime replacement
+* backend spoofing
+
+---
+
+## FAIL条件
+
+* unsigned runtime replacement
+* manifest injection
+* arbitrary DLL load
+
+---
+
+# SECTION 19
 
 # HASH RULES
 
@@ -541,45 +612,48 @@ SHA256 mandatory。
 
 ---
 
-# SECTION 18
+# SECTION 20
 
 # PASS AUTHORITY
 
 PASS可能主体：
 
 * acceptance_runner.exe
-* provenance verifier
+* provenance_verifier.exe
 * CI pipeline
+* binary inspector
 
 LLMは禁止：
 
 * PASS宣言
 * completion宣言
 * artifact生成
-* manifest自己記述
+* self-validation
 
 ---
 
-# SECTION 19
+# SECTION 21
 
 # DELIVERY BLOCKERS
 
 以下成立時：
 
-```text id="v6j2rk"
+```text id="xq0m1v"
 DELIVERY BLOCKED
 ```
 
 * FAIL >= 1
 * UNVERIFIED >= 1
 * provenance mismatch
-* hidden dependency
+* hidden backend
 * mock detected
-* execution trace broken
+* runtime trace broken
+* security violation
+* realtime instability
 
 ---
 
-# SECTION 20
+# SECTION 22
 
 # FINAL DELIVERY PACKAGE
 
@@ -588,16 +662,18 @@ DELIVERY BLOCKED
 * VeilVoiceInstaller.exe
 * acceptance_runner.exe
 * provenance_verifier.exe
+* binary_inspector.exe
 * acceptance_report.html
 * provenance_graph.json
 * all hashes
-* all logs
 * all traces
 * all execution IDs
+* routing topology
+* security audit logs
 
 ---
 
-# SECTION 21
+# SECTION 23
 
 # DEFINITION OF COMPLETE
 
@@ -605,18 +681,21 @@ DELIVERY BLOCKED
 
 * FAIL == 0
 * UNVERIFIED == 0
-* provenance valid
-* real inference verified
+* official runtime verified
+* official model verified
 * real audio generation verified
-* mock absent
-* execution chain valid
-* backend disclosed
+* provenance valid
+* callback stability verified
+* security verified
 * Discord verified
 * VRChat verified
+* no hidden backend
+* no bypass route
+* no replayed artifacts
 
 その時のみ：
 
-```text id="z6m2wr"
+```text id="7lm2cp"
 VeilVoice 完成
 ```
 
