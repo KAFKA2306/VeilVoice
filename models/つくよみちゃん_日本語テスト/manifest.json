@@ -1,0 +1,11 @@
+﻿{
+    "compatible_engine_versions":  [
+                                       "Beatrice v2"
+                                   ],
+    "speaker_id":  "test_jp",
+    "sample_rate":  48000,
+    "sha256":  "",
+    "model_path":  "model.onnx",
+    "model_name":  "Japanese Path Test",
+    "engine":  "Beatrice"
+}

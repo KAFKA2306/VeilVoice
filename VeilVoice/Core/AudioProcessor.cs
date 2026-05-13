@@ -35,8 +35,9 @@ namespace VeilVoice.Core
                     float[] chunk = new float[currentChunkSize];
                     Array.Copy(buffer, i, chunk, 0, currentChunkSize);
                     
-                    float[] processedChunk = _inference.Process(chunk);
-                    Array.Copy(processedChunk, 0, processedBuffer, i, Math.Min(currentChunkSize, processedChunk.Length));
+                    float[] processedChunk = new float[currentChunkSize];
+                    _inference.Process(chunk, processedChunk);
+                    Array.Copy(processedChunk, 0, processedBuffer, i, currentChunkSize);
                 }
 
                 using (var writer = new WaveFileWriter(outputPath, new WaveFormat(reader.WaveFormat.SampleRate, 16, 1)))

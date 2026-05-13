@@ -82,12 +82,31 @@
                         </StackPanel>
                     </Border>
 
-                    <!-- Model -->
-                    <Border Background="#13131F" CornerRadius="8" Padding="15" Margin="0,0,0,10">
+                    <!-- Model status & Library -->
+                    <Border Background="#13131F" CornerRadius="8" Padding="14" Margin="0,0,0,12">
                         <StackPanel>
-                            <TextBlock Style="{StaticResource Label}" Text="MODEL"/>
-                            <TextBlock x:Name="TxtModelStatus" Text="Not loaded" Foreground="Yellow" FontSize="11"/>
-                            <TextBlock x:Name="TxtModelHash" Text="" Foreground="#444" FontSize="9"/>
+                            <TextBlock Style="{StaticResource Label}" Text="Model Library (v3.1)"/>
+                            <Grid Margin="0,0,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <ComboBox x:Name="CbModels" Style="{StaticResource DarkCombo}"
+                                          SelectionChanged="CbModels_SelectionChanged" Grid.Column="0"/>
+                                <Button Content="Scan" Width="40" Margin="4,0,0,0" Grid.Column="1"
+                                        Background="#252540" Foreground="#A78BFA" FontSize="10"
+                                        Click="BtnScanModels_Click"/>
+                            </Grid>
+                            
+                            <TextBlock x:Name="TxtModelStatus" Text="No model selected"
+                                       Foreground="{StaticResource Yellow}" FontSize="12" TextWrapping="Wrap"/>
+                            <TextBlock x:Name="TxtModelHash" Text="" Foreground="#444466"
+                                       FontSize="10" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                            
+                            <Border x:Name="BdrModelBadge" Background="#252540" CornerRadius="4" Padding="6,2" 
+                                    Margin="0,8,0,0" HorizontalAlignment="Left" Visibility="Collapsed">
+                                <TextBlock x:Name="TxtModelBadge" Text="VERIFIED" Foreground="#4ADE80" FontSize="9" FontWeight="Bold"/>
+                            </Border>
                         </StackPanel>
                     </Border>
 

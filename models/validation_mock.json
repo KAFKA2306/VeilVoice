@@ -1,0 +1,11 @@
+﻿{
+    "compatible_engine_versions":  [
+                                       "Beatrice v2"
+                                   ],
+    "speaker_id":  "mock_verify",
+    "sample_rate":  48000,
+    "sha256":  "MOCK_VALIDATION",
+    "model_path":  "validation_mock.json",
+    "model_name":  "Validation Mock Speaker",
+    "engine":  "Beatrice"
+}

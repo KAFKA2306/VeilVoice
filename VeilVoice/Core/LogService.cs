@@ -38,6 +38,8 @@ namespace VeilVoice.Core
             
             try { OnMessage?.Invoke($"[{level.Trim()}] {message}"); }
             catch { }
+
+            Console.WriteLine($"[{level}] {message}");
         }
     }
 }

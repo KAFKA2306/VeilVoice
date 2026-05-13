@@ -20,9 +20,14 @@ namespace VeilVoice.Core
             return devices.Cast<MMDevice>().ToList();
         }
 
-        public static MMDevice FindVBCableInput()
+        public static MMDevice? FindVBCableInput()
         {
-            return GetOutputDevices().FirstOrDefault(d => d.FriendlyName.Contains("VeilVoiceOut"));
+            var devices = GetOutputDevices();
+            // Contract Option B: Use existing signed driver (VB-Audio/Voicemeeter)
+            return devices.FirstOrDefault(d => 
+                d.FriendlyName.Contains("VeilVoiceOut") || 
+                d.FriendlyName.Contains("CABLE Input") || 
+                d.FriendlyName.Contains("Voicemeeter VAIO"));
         }
 
 

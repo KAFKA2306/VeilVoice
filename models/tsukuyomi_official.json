@@ -1,0 +1,11 @@
+﻿{
+    "compatible_engine_versions":  [
+                                       "Beatrice v2"
+                                   ],
+    "speaker_id":  "tsukuyomi",
+    "sample_rate":  48000,
+    "sha256":  "294ee92c1a7a9d514285e313b54ef7b9e138e6b787deec8234a6ba7b6e5fdb0c",
+    "model_path":  "C:\\Users\\front\\OneDrive\\ドキュメント\\REAPER Media\\Beatrice\\beatrice_2.0.0-rc.0_official_model_1\\waveform_generator.bin",
+    "model_name":  "Tsukuyomi (Official)",
+    "engine":  "Beatrice"
+}
