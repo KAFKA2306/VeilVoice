@@ -1,290 +1,338 @@
-# VeilVoice
+# VEILVOICE
 
-# Beatrice Virtual Mic - Executable Acceptance Contract v1.0
+# EXECUTABLE DELIVERY & ACCEPTANCE CONTRACT
 
-## Contract Rules
+# VERSION 1.0
 
-本ドキュメントは「作業メモ」ではない。
-本ドキュメントは「納入判定契約」である。
+本契約は、
+「AIリアルタイムボイスチェンジャー VeilVoice」
+の納入条件、検証条件、完成定義を規定する。
 
-LLM、人間、開発者の発言は証拠にならない。
-証拠として有効なのは以下のみ：
+本契約は「努力義務」ではない。
 
-* acceptance_runner が生成した成果物
-* 自動保存ログ
-* 録音ファイル
-* スクリーンショット
-* JSON結果
-* ハッシュ付きartifact
-* Git commit
-* 実行環境情報
+本契約は：
 
-禁止事項：
+* 実機動作
+* 再現可能性
+* 自動検証
+* 証拠生成
+* Windows統合
+* 音声安全性
 
-* 「たぶん動く」
-* 「コード上問題ない」
-* 「設計的にはOK」
-* 「再現できないがPASS」
-* 手動PASS宣言
-* スクリーンショット手差し替え
-* ログ編集
-
-状態定義：
-
-PASS:
-
-* required artifacts complete
-* automatic judge passed
-* hash valid
-
-FAIL:
-
-* evidence exists and condition failed
-
-UNVERIFIED:
-
-* evidence missing
-* automation incomplete
-* environment invalid
-* runner crashed
-
-すべてのテスト結果は以下を必須とする：
-
-* timestamp
-* machine_id
-* os_version
-* app_version
-* git_commit
-* artifacts_hash
-* test_duration_ms
+を含む「完成保証契約」である。
 
 ---
 
-# SECTION 1 - INSTALLATION
+# SECTION 0
 
-## TEST-INSTALL-001
+# DEFINITIONS
 
-Requirement:
-Windows 11クリーン環境で15分以内に利用開始できること。
+## PRODUCT
 
-Environment:
+VeilVoice:
+リアルタイム音声変換アプリケーション。
+
+## TARGET PLATFORM
 
 * Windows 11 24H2
-* no Python
-* no VoiceMeeter
-* no REAPER
-* no VB-CABLE preinstalled
+* x64
+* 日本語環境
+* 英語環境
 
-Test Method:
-acceptance_runner.exe --test clean_install
+## TARGET INPUT DEVICE
+
+* FIFINE USB microphone
+
+## TARGET OUTPUT DEVICE
+
+* VeilVoiceOut
+* Windows Recording Endpoint
+
+## TARGET APPLICATIONS
+
+* Discord Stable
+* VRChat
+* OBS Studio
+
+---
+
+# SECTION 1
+
+# CONTRACT PRINCIPLES
+
+## PRINCIPLE-001
+
+LLM、人間、開発者の発言は、
+完成証拠として無効。
+
+## PRINCIPLE-002
+
+以下のみ有効証拠とする：
+
+* acceptance_runner.exe 出力
+* 自動生成artifact
+* hash付き成果物
+* 実録音wav
+* endpoint列挙結果
+* JSON logs
+* CI results
+* crash dumps
+
+## PRINCIPLE-003
+
+PASSは、
+機械検証済みartifactが存在する場合のみ成立。
+
+## PRINCIPLE-004
+
+証拠欠落時、
+必ず UNVERIFIED とする。
+
+## PRINCIPLE-005
+
+以下は禁止：
+
+* “動くはず”
+* “設計上問題ない”
+* “コードレビュー済み”
+* “実質完成”
+* “ほぼOK”
+* “再現できないがPASS”
+
+---
+
+# SECTION 2
+
+# REQUIRED DELIVERY COMPONENTS
+
+納入対象：
+
+* VeilVoice application
+* signed installer
+* virtual audio driver
+* acceptance_runner.exe
+* CI configuration
+* automated verification scripts
+* uninstall utility
+* crash recovery subsystem
+* realtime logging subsystem
+
+---
+
+# SECTION 3
+
+# BOOTSTRAP GUARANTEE
+
+## TEST-BOOTSTRAP-001
+
+Requirement:
+Windows初心者が、
+15分以内にVC可能状態へ到達できること。
+
+禁止事項：
+
+* VoiceMeeter要求
+* VB-CABLE手動設定
+* REAPER要求
+* PowerShell操作要求
+* WDKインストール要求
+* registry手編集
+* endpoint GUID編集
+* Windows既定変更要求
+
+PASS条件：
+
+* installer起動のみで利用開始
+* FIFINE mic自動検出
+* VeilVoiceOut自動生成
+* Discord入力選択可能
 
 Artifacts:
 
 * install_log.txt
-* installer_exit_code.txt
 * install_duration.json
-* installed_programs.json
-* device_manager_capture.png
-
-PASS:
-
-* install_duration <= 15min
-* virtual mic appears
-* reboot not required
-* no manual driver patch
+* bootstrap_capture.mp4
+* endpoint_after_install.json
 
 FAIL:
 
-* manual WDK install required
-* unsigned driver blocking
-* Python install required
-* PATH editing required
-
-UNVERIFIED:
-
-* missing artifacts
-* installer aborted
+* reboot mandatory
+* manual routing required
+* PowerShell required
 
 ---
 
-# SECTION 2 - VIRTUAL MIC DETECTION
+# SECTION 4
+
+# INPUT DEVICE GUARANTEE
+
+## TEST-INPUT-001
+
+Requirement:
+FIFINE microphone を自動入力として使用。
+
+PASS:
+
+selected_input_device.json:
+
+```json id="8r8y0z"
+{
+  "device_name": "FIFINE ..."
+}
+```
+
+Artifacts:
+
+* input_endpoint_list.json
+* selected_input_device.json
+* initialization_log.txt
+
+FAIL:
+
+* unknown mic selected
+* manual selection required
+
+---
+
+# SECTION 5
+
+# VIRTUAL MIC GUARANTEE
 
 ## TEST-VMIC-001
 
 Requirement:
-仮想マイクがWindows録音デバイスとして認識されること。
-
-Test Method:
-acceptance_runner.exe --test endpoint_visibility
-
-Artifacts:
-
-* endpoint_list.json
-* endpoint_guid.txt
-* sound_settings_capture.png
-* audio_service_log.txt
+VeilVoiceOut endpoint が生成されること。
 
 PASS:
 
-* endpoint visible
-* GUID stable across reboot
-* endpoint enabled
+virtual_endpoint_list.json:
+
+```json id="zw8lbm"
+{
+  "endpoint_name": "VeilVoiceOut"
+}
+```
+
+Artifacts:
+
+* virtual_endpoint_list.json
+* veilvoiceout_guid.txt
+* windows_recording_devices.png
 
 FAIL:
 
-* endpoint hidden
-* GUID changes
-* duplicate endpoints generated
-
-UNVERIFIED:
-
-* endpoint enumeration failed
+* endpoint absent
+* VB-CABLE visible
+* VoiceMeeter exposed
 
 ---
 
-# SECTION 3 - DISCORD COMPATIBILITY
+# SECTION 6
+
+# DISCORD GUARANTEE
 
 ## TEST-DISCORD-001
 
 Requirement:
-Discord入力デバイスとして使用可能。
+Discord Stable にて入力デバイスとして使用可能。
 
-Environment:
+PASS:
 
-* Discord Stable latest
-
-Test Method:
-acceptance_runner.exe --test discord_input_visibility
+* Discord input list contains VeilVoiceOut
+* Discord input meter reacts
 
 Artifacts:
 
 * discord_capture.png
-* endpoint_match.json
-* discord_audio_meter_capture.png
-
-PASS:
-
-* device selectable
-* meter reacts
-* no reboot required
+* discord_meter_capture.png
+* discord_endpoint_log.json
 
 FAIL:
 
-* default device switching required
 * Discord restart required
-* device invisible
-
-UNVERIFIED:
-
-* Discord automation unavailable
+* endpoint invisible
+* default device dependency
 
 ---
 
-# SECTION 4 - VRCHAT COMPATIBILITY
+# SECTION 7
+
+# VRCHAT GUARANTEE
 
 ## TEST-VRCHAT-001
 
 Requirement:
-VRChatマイク入力として認識される。
-
-Test Method:
-acceptance_runner.exe --test vrchat_input_visibility
+VRChat microphone inputとして利用可能。
 
 Artifacts:
 
 * vrchat_capture.png
-* vrchat_log.txt
-* endpoint_map.json
-
-PASS:
-
-* selectable
-* voice transmitted
+* vrchat_audio_log.txt
 
 FAIL:
 
-* mic unavailable
+* no mic detected
 * crash occurs
-
-UNVERIFIED:
-
-* VRChat unavailable
 
 ---
 
-# SECTION 5 - RAW VOICE LEAK PREVENTION
+# SECTION 8
+
+# RAW VOICE LEAK PREVENTION
 
 ## TEST-PRIVACY-001
 
 Requirement:
 生声がVCへ流出しない。
 
-Test Method:
-acceptance_runner.exe --test raw_voice_leak
+PASS:
+
+* processed voice exists
+* raw voice absent
+* mute outputs silence
 
 Artifacts:
 
 * raw_input.wav
 * processed_output.wav
-* mute_output.wav
+* muted_output.wav
 * correlation_metrics.json
-
-PASS:
-
-* mute state outputs silence
-* processed voice only
-* raw correlation below threshold
 
 FAIL:
 
-* raw voice detectable
-* fallback routes raw mic
-
-UNVERIFIED:
-
-* audio comparison failed
+* raw mic audible
+* bypass routing active
 
 ---
 
-# SECTION 6 - LATENCY
+# SECTION 9
+
+# LATENCY GUARANTEE
 
 ## TEST-LATENCY-001
 
 Requirement:
-往復遅延150ms未満。
-
-Test Method:
-acceptance_runner.exe --test latency
+p95 latency < 150ms
 
 Artifacts:
 
 * latency_metrics.json
 * waveform_alignment.png
-* realtime_log.txt
-
-PASS:
-
-* p95 latency < 150ms
 
 FAIL:
 
-* p95 latency >= 150ms
-
-UNVERIFIED:
-
-* sync failure
+* p95 >= 150ms
 
 ---
 
-# SECTION 7 - LONG RUN STABILITY
+# SECTION 10
+
+# LONGRUN STABILITY
 
 ## TEST-STABILITY-001
 
 Requirement:
-3時間連続運用可能。
-
-Test Method:
-acceptance_runner.exe --test longrun --duration 3h
+3時間以上安定動作。
 
 Artifacts:
 
@@ -293,218 +341,251 @@ Artifacts:
 * dropout_log.txt
 * audio_crc_log.txt
 
-PASS:
-
-* no crash
-* no unrecovered dropout
-* memory growth within threshold
-
 FAIL:
 
 * freeze
+* unrecovered dropout
 * audio corruption
 * memory leak
 
-UNVERIFIED:
-
-* interrupted run
-
 ---
 
-# SECTION 8 - DEVICE HOTPLUG
+# SECTION 11
+
+# DEVICE HOTPLUG
 
 ## TEST-HOTPLUG-001
 
 Requirement:
-USB抜き差しで復旧する。
-
-Test Method:
-acceptance_runner.exe --test hotplug
+USB抜き差し後5秒以内復旧。
 
 Artifacts:
 
-* device_change_log.txt
 * reconnect_log.txt
-* endpoint_before_after.json
-
-PASS:
-
-* auto reconnect success
-* audio restored <= 5s
+* device_change_log.txt
 
 FAIL:
 
-* app restart required
-* permanent disconnect
-
-UNVERIFIED:
-
-* hotplug event missing
+* restart required
+* endpoint lost
 
 ---
 
-# SECTION 9 - CRASH RECOVERY
+# SECTION 12
 
-## TEST-RECOVERY-001
+# CRASH SAFETY
+
+## TEST-CRASH-001
 
 Requirement:
-異常終了後もWindows音声環境を壊さない。
-
-Test Method:
-acceptance_runner.exe --test forced_crash
+異常終了後もWindows音声環境を破壊しない。
 
 Artifacts:
 
 * crash_dump.dmp
-* recovery_log.txt
 * endpoint_post_crash.json
-
-PASS:
-
-* Windows audio operational
-* no phantom endpoint
-* restart possible
+* audio_service_state.json
 
 FAIL:
 
-* audio service corruption
-* endpoint zombie remains
-
-UNVERIFIED:
-
-* crash injection failed
+* audio service broken
+* zombie endpoint remains
 
 ---
 
-# SECTION 10 - RESOURCE USAGE
+# SECTION 13
+
+# RESOURCE GUARANTEE
 
 ## TEST-PERF-001
 
 Requirement:
-CPU常用率30%以下。
+平均CPU使用率30%以下。
 
 Environment:
-
-* Ryzen 7 5800X baseline
-
-Test Method:
-acceptance_runner.exe --test perf
+Ryzen 7 5800X baseline
 
 Artifacts:
 
 * cpu_usage.csv
-* gpu_usage.csv
 * inference_timing.csv
-
-PASS:
-
-* avg_cpu <= 30%
 
 FAIL:
 
 * avg_cpu > 30%
 
-UNVERIFIED:
-
-* metrics unavailable
-
 ---
 
-# SECTION 11 - CONFIGURATION
+# SECTION 14
+
+# CONFIG PERSISTENCE
 
 ## TEST-CONFIG-001
 
 Requirement:
 再起動後も設定保持。
 
-Test Method:
-acceptance_runner.exe --test config_persistence
-
 Artifacts:
 
 * config_before.json
 * config_after.json
-* startup_log.txt
-
-PASS:
-
-* configs identical
 
 FAIL:
 
 * settings reset
 
-UNVERIFIED:
-
-* config unreadable
-
 ---
 
-# SECTION 12 - UNINSTALL
+# SECTION 15
+
+# UNINSTALL SAFETY
 
 ## TEST-UNINSTALL-001
 
 Requirement:
 完全アンインストール可能。
 
-Test Method:
-acceptance_runner.exe --test uninstall
-
 Artifacts:
 
 * uninstall_log.txt
-* registry_diff.json
-* endpoint_post_uninstall.json
 * leftover_files.txt
-
-PASS:
-
-* no active endpoint
-* no orphan service
-* no startup task
+* registry_diff.json
 
 FAIL:
 
-* zombie driver remains
-* orphan registry remains
-
-UNVERIFIED:
-
-* uninstall interrupted
+* orphan driver remains
+* endpoint zombie remains
 
 ---
 
-# FINAL ACCEPTANCE RULES
+# SECTION 16
 
-製品納入条件：
+# DRIVER REQUIREMENTS
 
-* FAIL = 0
-* UNVERIFIED = 0
-* PASS rate = 100%
-* artifact hash valid
-* all logs reproducible
+## DRIVER-001
 
-LLMは禁止：
+Requirement:
+Virtual audio driver signed.
 
-* PASS宣言
-* 主観評価
-* “ほぼ完成”
-* “実質OK”
+PASS:
 
-最終納入物：
+* Microsoft attestation signing valid
 
-* acceptance_report.html
-* results/*.json
-* artifacts/*
-* logs/*
-* hashes.sha256
-* git_commit.txt
-* build_manifest.json
+Artifacts:
+
+* driver_signature_report.txt
+* signtool_verify.txt
+
+FAIL:
+
+* unsigned driver
+* test mode dependency
+
+---
+
+# SECTION 17
+
+# ARTIFACT REQUIREMENTS
+
+全テスト成果物は以下必須：
+
+* timestamp
+* machine_id
+* git_commit
+* app_version
+* artifacts_hash
+* os_version
+
+hash algorithm:
+SHA256
+
+---
+
+# SECTION 18
+
+# ACCEPTANCE RUNNER REQUIREMENTS
+
+acceptance_runner.exe は：
+
+* standalone executable
+* no Python dependency
+* deterministic output
+* reproducible execution
+
+であること。
+
+---
+
+# SECTION 19
+
+# FINAL DELIVERY BLOCKERS
+
+以下成立時、
+納入禁止：
+
+* FAIL >= 1
+* UNVERIFIED >= 1
+* artifact missing
+* hash mismatch
+* non reproducible result
+
+---
+
+# SECTION 20
+
+# FINAL ACCEPTANCE AUTHORITY
 
 完成判定主体：
 
 * acceptance_runner.exe
 * CI pipeline
-* human reviewer
+* human artifact review
 
-LLMは完成判定主体ではない。
+LLMは：
+
+* 完成判定権限なし
+* PASS宣言権限なし
+* artifact改変権限なし
+
+---
+
+# SECTION 21
+
+# FINAL DELIVERY PACKAGE
+
+最終納入物：
+
+* VeilVoiceInstaller.exe
+* acceptance_runner.exe
+* acceptance_report.html
+* all logs
+* all artifacts
+* hashes.sha256
+* CI bundle
+* crash dump bundle
+* reproducibility manifest
+* endpoint GUID report
+* uninstall verification report
+
+---
+
+# SECTION 22
+
+# DEFINITION OF COMPLETE
+
+以下すべて成立時のみ：
+
+* FAIL == 0
+* UNVERIFIED == 0
+* artifact integrity valid
+* CI reproducible
+* reboot persistence valid
+* Discord verified
+* VRChat verified
+* raw voice leak absent
+
+その時のみ：
+
+「VeilVoice 完成」
+
+と定義する。
