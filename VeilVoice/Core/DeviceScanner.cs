@@ -49,5 +49,19 @@ namespace VeilVoice.Core
                 return inputs.FirstOrDefault();
             }
         }
+        public static string GetEndpointDisclosure()
+        {
+            var vvo = FindVBCableInput();
+            if (vvo == null) return "None";
+
+            var info = new
+            {
+                Name = vvo.FriendlyName,
+                Id = vvo.ID,
+                State = vvo.State.ToString(),
+                Provider = vvo.FriendlyName.Contains("Voicemeeter") ? "VB-Audio Software" : "Unknown"
+            };
+            return System.Text.Json.JsonSerializer.Serialize(info, new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+        }
     }
 }

@@ -3,9 +3,10 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using Microsoft.ML.OnnxRuntime;
-using Microsoft.ML.OnnxRuntime.Tensors;
+using System.Runtime.InteropServices;
 using VeilVoice.Core;
 using VeilVoice.Core.Models;
+using Microsoft.ML.OnnxRuntime.Tensors;
 
 namespace VeilVoice.Inference
 {
@@ -17,6 +18,7 @@ namespace VeilVoice.Inference
         private InferenceSession? _session;
         private readonly string _modelPath;
         private readonly string _expectedHash;
+        private string? _inputName;
         
         public ModelManifest? Manifest { get; private set; }
         public string EngineName => "Beatrice v2 (ONNX)";
@@ -36,15 +38,6 @@ namespace VeilVoice.Inference
 
         private void Initialize()
         {
-            // Contract v3.1: Support MOCK_VALIDATION for system integrity checks without weights
-            if (_expectedHash == "MOCK_VALIDATION")
-            {
-                IsReady = true;
-                StatusMessage = "Ready (MOCK_VALIDATION MODE)";
-                LogService.Info($"[Beatrice] MOCK MODE ACTIVE for {Manifest?.ModelName}");
-                return;
-            }
-
             try
             {
                 if (!File.Exists(_modelPath))
@@ -67,6 +60,7 @@ namespace VeilVoice.Inference
                 options.AppendExecutionProvider_CPU(); // Default for stability
 
                 _session = new InferenceSession(_modelPath, options);
+                _inputName = _session.InputMetadata.Keys.FirstOrDefault() ?? "input";
 
                 // Compatibility Validation (SECTION 32)
                 if (!ValidateCompatibility(out string reason))
@@ -91,22 +85,36 @@ namespace VeilVoice.Inference
         public bool ValidateCompatibility(out string reason)
         {
             reason = string.Empty;
-            if (_expectedHash == "MOCK_VALIDATION") return true;
             if (_session == null) return false;
 
-            // Beatrice v2 typically has specific input nodes: "input", "speaker_id", etc.
-            // For now, we check if the session has inputs/outputs.
-            if (!_session.InputMetadata.Any() || !_session.OutputMetadata.Any())
+            // Contract v4.0 REQUIREMENT: Beatrice architecture compatible
+            // Beatrice v2 (ONNX) typical signature:
+            // Inputs: "input" (float, [1, length]), "speaker_id" (int64/float, [1])
+            // OR custom variations, but must have specific nodes for VC.
+
+            if (!_session.InputMetadata.ContainsKey("input"))
             {
-                reason = "No input/output nodes found.";
+                reason = "Missing mandatory 'input' node (Beatrice architecture violation).";
                 return false;
             }
 
-            // SECTION 32: Tensor shape validation
-            // Example: Verify 'input' exists and is float
-            if (!_session.InputMetadata.ContainsKey("input"))
+            // Real Beatrice v2 models often have multiple inputs or specific output shapes.
+            // For now, we enforce that it MUST NOT be a generic single-input-single-output model
+            // if we want to claim "Beatrice" authenticity, unless it matches the v2 specs.
+            
+            bool hasSpeakerId = _session.InputMetadata.ContainsKey("speaker_id");
+            bool hasSpeakerEmbed = _session.InputMetadata.ContainsKey("speaker_embedding");
+
+            if (!hasSpeakerId && !hasSpeakerEmbed)
             {
-                reason = "Missing 'input' node.";
+                reason = "Model lacks Beatrice-specific control nodes (speaker_id/embedding). Likely a generic ONNX model.";
+                return false;
+            }
+
+            // Check sample rate compatibility if manifest provides it
+            if (Manifest != null && Manifest.SampleRate != 48000)
+            {
+                reason = $"Sample rate mismatch: Expected 48000, Model says {Manifest.SampleRate}.";
                 return false;
             }
 
@@ -115,7 +123,7 @@ namespace VeilVoice.Inference
 
         public void Process(float[] input, float[] output)
         {
-            if (!IsReady || _session == null)
+            if (!IsReady || _session == null || _inputName == null)
             {
                 Array.Clear(output, 0, output.Length);
                 return;
@@ -123,15 +131,26 @@ namespace VeilVoice.Inference
 
             try
             {
-                // Note: Actual Beatrice v2 ONNX mapping requires proper tensor shapes.
-                // This is a placeholder for the inference loop.
-                // In a real implementation, we would map input -> session.Run -> output.
-                
-                // For the purpose of the acceptance runner and contract verification:
-                // If we reach here, inference is considered "functional" in the engine graph.
-                
-                // Simulate processing (copy for now, real implementation needs the .onnx inputs)
-                Array.Copy(input, output, input.Length);
+                // Provenance Trace (Contract v4.0 SECTION 3)
+                string executionDir = Path.Combine(AppContext.BaseDirectory, "provenance", ProvenanceService.CurrentExecutionId);
+                Directory.CreateDirectory(executionDir);
+
+                // Dump Input Tensor
+                string inputPath = Path.Combine(executionDir, "tensor_input_dump.bin");
+                File.WriteAllBytes(inputPath, MemoryMarshal.AsBytes(input.AsSpan()).ToArray());
+                ProvenanceService.RegisterArtifact(inputPath, "tensor_input", $"Engine: {EngineName}");
+
+                var inputTensor = new DenseTensor<float>(input, new[] { 1, input.Length });
+                var inputs = new List<NamedOnnxValue> { NamedOnnxValue.CreateFromTensor(_inputName, inputTensor) };
+
+                using var outputs = _session.Run(inputs);
+                var result = outputs.First().AsTensor<float>().ToArray();
+                Array.Copy(result, output, Math.Min(result.Length, output.Length));
+
+                // Dump Output Tensor
+                string outputPath = Path.Combine(executionDir, "tensor_output_dump.bin");
+                File.WriteAllBytes(outputPath, MemoryMarshal.AsBytes(result.AsSpan()).ToArray());
+                ProvenanceService.RegisterArtifact(outputPath, "tensor_output", $"Engine: {EngineName}");
             }
             catch (Exception ex)
             {

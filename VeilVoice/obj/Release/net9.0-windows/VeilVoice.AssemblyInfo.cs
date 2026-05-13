@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("VeilVoice")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+d7a999184a7f12c5f805944adc3f67684dfc7347")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+41758e1a2e71db1b31e166e7487b356a99cff136")]
 [assembly: System.Reflection.AssemblyProductAttribute("VeilVoice")]
 [assembly: System.Reflection.AssemblyTitleAttribute("VeilVoice")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

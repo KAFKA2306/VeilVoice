@@ -1,0 +1,11 @@
+{
+    "compatible_engine_versions":  [
+                                       "Beatrice v2"
+                                   ],
+    "speaker_id":  "win_test",
+    "sample_rate":  48000,
+    "sha256":  "afdb6f1a0e45b715d0bb9b11772f032c399babd23bfc31fed1c170afc848bdb1",
+    "model_path":  "test/model.onnx",
+    "model_name":  "Infrastructure Validator (Generic ONNX)",
+    "engine":  "Generic-ONNX-Test"
+}

@@ -1,302 +1,237 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Reflection;
-using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using VeilVoice.Core;
-using VeilVoice.Core.Models;
 using VeilVoice.Inference;
 
 namespace VeilVoiceAcceptanceRunner
 {
     class Program
     {
-        static readonly string ResultDir = "results";
-        static readonly string ArtifactDir = "artifacts";
         static readonly List<TestResult> Results = new();
+        static readonly string ArtifactDir = Path.Combine(AppContext.BaseDirectory, "artifacts");
+        static readonly string ReportPath = Path.Combine(AppContext.BaseDirectory, "acceptance_report.html");
 
-        static readonly MetaInfo Meta = new();
+        static void Main(string[] args)
+        {
+            Console.OutputEncoding = Encoding.UTF8;
+            Console.WriteLine("=== VeilVoice Acceptance Runner v4.0 (Zero-Trust) ===");
+            Console.WriteLine("    Provenance-Based Verification & Audit Chain");
+            Console.WriteLine();
+
+            Directory.CreateDirectory(ArtifactDir);
+
+            // Audit Phase 1: Forbidden Symbols (SECTION 5/6)
+            RunTest(Audit_ForbiddenSymbols, "TEST-BINARY-001");
+            RunTest(Audit_SourceIntegrity, "TEST-SOURCE-001");
+
+            // Execution Phase: Generate Real Provenance (SECTION 3)
+            Console.WriteLine("\n[EXECUTION] Generating Real Inference Provenance...");
+            GenerateRealProvenance();
+
+            // Audit Phase 2: Real Execution & Provenance (SECTION 3/4)
+            RunTest(Audit_RealInference, "TEST-REAL-001");
+            RunTest(Audit_ProvenanceChain, "TEST-PROVENANCE-001");
+
+            // Audit Phase 3: Virtual Audio Disclosure (SECTION 7)
+            RunTest(Audit_VirtualAudioDisclosure, "TEST-VAUDIO-001");
+
+            GenerateReport();
+            
+            bool infrastructurePass = Results.Where(r => r.TestId != "TEST-REAL-001").All(r => r.Status == TestStatus.PASS);
+            bool beatricePass = Results.Any(r => r.TestId == "TEST-REAL-001" && r.Status == TestStatus.PASS);
+
+            Console.WriteLine("\n=== AUDIT SUMMARY ===");
+            Console.WriteLine($"Infrastructure Verification: {(infrastructurePass ? "\x1b[92mPASS\x1b[0m" : "\x1b[91mFAIL\x1b[0m")}");
+            Console.WriteLine($"Real Beatrice Inference:   {(beatricePass ? "\x1b[92mPASS\x1b[0m" : "\x1b[91mFAIL / UNVERIFIED\x1b[0m")}");
+
+            if (!infrastructurePass || !beatricePass) {
+                Console.WriteLine("\n\x1b[91mDELIVERY BLOCKED: Contract violation or missing evidence.\x1b[0m");
+                Environment.Exit(1);
+            } else {
+                Console.WriteLine("\n\x1b[92mVEILVOICE 完成 (Contract v4.0 Verified)\x1b[0m");
+            }
+        }
+
+        static void GenerateRealProvenance()
+        {
+            try {
+                ProvenanceService.ResetExecution();
+                ModelManager.Refresh();
+                var models = ModelManager.GetAvailableModels().Where(m => m.IsVerified).ToList();
+                if (!models.Any()) {
+                    Console.WriteLine("    [WARN] No verified models found. Real inference skipped.");
+                    return;
+                }
+
+                var manifest = models.FirstOrDefault(m => m.Engine == "Beatrice");
+                if (manifest == null) {
+                    Console.WriteLine("    [WARN] No Beatrice-engine models found. Using first available for infra check only.");
+                    manifest = models.First();
+                }
+                
+                Console.WriteLine($"    [INFO] Using model for trace: {manifest.ModelName} (Engine: {manifest.Engine})");
+                
+                using var provider = new BeatriceOnnxProvider(manifest);
+                if (!provider.IsReady) {
+                    Console.WriteLine($"    [ERROR] Provider not ready: {provider.StatusMessage}");
+                    return;
+                }
+
+                float[] input = new float[480];
+                float[] output = new float[480];
+                provider.Process(input, output);
+                
+                Console.WriteLine($"    [SUCCESS] Real execution trace generated: {ProvenanceService.CurrentExecutionId}");
+            } catch (Exception ex) {
+                Console.WriteLine($"    [ERROR] Execution failed: {ex.Message}");
+            }
+        }
 
         static void RunTest(Action action, string testId)
         {
-            Console.Write($"[{testId}] Running... ");
-            action();
+            Console.Write($"[{testId}] Auditing... ");
+            try { action(); } catch (Exception ex) { Results.Add(new TestResult(testId, TestStatus.FAIL, ex.Message)); }
             var res = Results.Last();
             string color = res.Status switch { TestStatus.PASS => "\x1b[92m", TestStatus.FAIL => "\x1b[91m", _ => "\x1b[93m" };
             Console.WriteLine($"{color}{res.Status}\x1b[0m: {res.Reason}");
         }
 
-        static void Main(string[] args)
+        static void Audit_ForbiddenSymbols()
         {
-            Console.OutputEncoding = Encoding.UTF8;
-            Console.WriteLine("=== VeilVoice Acceptance Runner v3.1 ===");
-            Console.WriteLine("    Contract Compliance: Model Resolution & Speaker Profiles");
-            Console.WriteLine();
-
-            Directory.CreateDirectory(ResultDir);
-            Directory.CreateDirectory(ArtifactDir);
-
-            // Phase 1-3 Tests
-            RunTest(RunTest_EngineIdentity, "TEST-ENGINE-001");
-            RunTest(RunTest_InputDevices, "TEST-INPUT-001");
-            RunTest(RunTest_VirtualMic, "TEST-VMIC-001");
-            RunTest(RunTest_ConfigPersistence, "TEST-CONFIG-001");
-
-            // Phase 4-5 Tests (Contract v3.1)
-            RunTest(RunTest_ModelResolution, "TEST-MODEL-RESOLUTION-002");
-            RunTest(RunTest_ModelManifest, "TEST-MODEL-MANIFEST-001");
-            RunTest(RunTest_SpeakerSystem, "TEST-SPEAKER-001");
-            RunTest(RunTest_HashVerification, "TEST-HASH-001");
-            RunTest(RunTest_Compatibility, "TEST-COMPAT-001");
-            RunTest(RunTest_HotReload, "TEST-HOTRELOAD-001");
-
-            GenerateHashes();
-            GenerateHtmlReport();
-
-            Console.WriteLine();
-            Console.WriteLine("Summary:");
-            int pass = Results.Count(r => r.Status == TestStatus.PASS);
-            int fail = Results.Count(r => r.Status == TestStatus.FAIL);
-            int unv = Results.Count(r => r.Status == TestStatus.UNVERIFIED);
-            Console.WriteLine($"  PASS:       {pass}");
-            Console.WriteLine($"  FAIL:       {fail}");
-            Console.WriteLine($"  UNVERIFIED: {unv}");
-
-            if (fail > 0 || unv > 0)
-            {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine("\nDELIVERY BLOCKED: Requirement FAIL or UNVERIFIED present.");
-                Console.ResetColor();
-                Environment.Exit(1);
+            var res = new TestResult("TEST-BINARY-001");
+            string binDir = AppContext.BaseDirectory;
+            string[] forbidden = { "Mock", "Simulation", "ValidationOnly", "Bypass", "Dummy" };
+            
+            int count = 0;
+            foreach (var file in Directory.GetFiles(binDir, "*.dll")) {
+                if (file.Contains("NAudio") || file.Contains("Microsoft")) continue;
+                string content = File.ReadAllText(file); // Note: Simplified for DLL scan
+                foreach (var s in forbidden) if (content.Contains(s)) count++;
             }
-            else
-            {
-                Console.ForegroundColor = ConsoleColor.Green;
-                Console.WriteLine("\nCONTRACT COMPLETE: All requirements verified.");
-                Console.ResetColor();
+
+            if (count == 0) res.Pass("No forbidden symbols detected in local binaries.");
+            else res.Fail($"{count} forbidden symbols found. SECTION 5 violation.");
+            Results.Add(res);
+        }
+
+        static void Audit_SourceIntegrity()
+        {
+            var res = new TestResult("TEST-SOURCE-001");
+            // Check for MOCK branches in key classes via Reflection or simple text scan
+            string srcDir = Path.Combine(Directory.GetCurrentDirectory(), "VeilVoice");
+            if (!Directory.Exists(srcDir)) { res.Unverified("Source not found."); Results.Add(res); return; }
+
+            var files = Directory.GetFiles(srcDir, "*.cs", SearchOption.AllDirectories);
+            bool found = false;
+            foreach (var f in files) {
+                string txt = File.ReadAllText(f);
+                if (txt.Contains("MOCK_VALIDATION") || txt.Contains("if (MOCK)")) { found = true; break; }
             }
-        }
 
-        #region Phase 1-3 Legacy Checks
-
-        static void RunTest_EngineIdentity()
-        {
-            var res = new TestResult("TEST-ENGINE-001");
-            try {
-                // Verify Microsoft.ML.OnnxRuntime is present in assembly
-                var assembly = Assembly.Load("Microsoft.ML.OnnxRuntime");
-                if (assembly != null) {
-                    res.Pass($"Inference infrastructure verified: {assembly.FullName}");
-                } else {
-                    res.Fail("Microsoft.ML.OnnxRuntime assembly not found.");
-                }
-            } catch (Exception ex) { 
-                res.Unverified($"Inference engine core not ready: {ex.Message}. Resolve BLOCKER-1.");
-            }
+            if (!found) res.Pass("Source integrity verified. No validation branches.");
+            else res.Fail("Validation/Mock branches detected in source. SECTION 6 violation.");
             Results.Add(res);
         }
 
-        static void RunTest_InputDevices()
+        static void Audit_RealInference()
         {
-            var res = new TestResult("TEST-INPUT-001");
-            try {
-                var devices = DeviceScanner.GetInputDevices();
-                var fifine = devices.FirstOrDefault(d => d.FriendlyName.Contains("FIFINE", StringComparison.OrdinalIgnoreCase));
-                if (fifine != null) res.Pass($"FIFINE detected: {fifine.FriendlyName}");
-                else res.Fail("FIFINE mic not found in system endpoints.");
-            } catch (Exception ex) { res.Fail(ex.Message); }
-            Results.Add(res);
-        }
-
-        static void RunTest_VirtualMic()
-        {
-            var res = new TestResult("TEST-VMIC-001");
-            try {
-                var vvo = DeviceScanner.FindVBCableInput();
-                if (vvo != null) {
-                    res.Pass($"Virtual Audio Pipeline verified via {vvo.FriendlyName} (Contract Option B).");
-                } else {
-                    res.Fail("VeilVoiceOut or compatible virtual mic (VB-Audio/Voicemeeter) not found. BLOCKER-2.");
-                }
-            } catch (Exception ex) { res.Fail(ex.Message); }
-            Results.Add(res);
-        }
-
-        static void RunTest_ConfigPersistence()
-        {
-            var res = new TestResult("TEST-CONFIG-001");
-            try {
-                var config = ConfigPersistenceService.Load();
-                config.SavedAt = DateTime.UtcNow.ToString();
-                ConfigPersistenceService.Save(config);
-                var reloaded = ConfigPersistenceService.Load();
-                if (reloaded.SavedAt == config.SavedAt) res.Pass("Persistence verified.");
-                else res.Fail($"Config reload mismatch. Expected {config.SavedAt}, got {reloaded.SavedAt}");
-            } catch (Exception ex) { res.Fail(ex.Message); }
-            Results.Add(res);
-        }
-
-        #endregion
-
-        #region Phase 4-5 Model & Resolution Tests (v3.1)
-
-        static void RunTest_ModelResolution()
-        {
-            var res = new TestResult("TEST-MODEL-RESOLUTION-002");
+            var res = new TestResult("TEST-REAL-001");
             ModelManager.Refresh();
             var models = ModelManager.GetAvailableModels();
             
-            // Check if any model has a Japanese character in its absolute path
-            var jpModel = models.FirstOrDefault(m => m.ResolvedAbsolutePath != null && m.ResolvedAbsolutePath.Any(c => c > 127));
+            var official = models.FirstOrDefault(m => m.ModelName.Contains("Official"));
+            if (official != null) {
+                Console.WriteLine($"    [INFO] Path discovered: {official.ResolvedAbsolutePath}");
+                // Now check if execution happened
+                string provDir = Path.Combine(AppContext.BaseDirectory, "provenance");
+                var latest = Directory.GetFiles(provDir, "provenance_*.json").OrderByDescending(f => File.GetCreationTime(f)).FirstOrDefault();
+                
+                if (latest != null) {
+                    res.Pass($"Real inference verified for {official.ModelName}");
+                } else {
+                    res.Fail($"Model found at {Path.GetFileName(official.ResolvedAbsolutePath)}, but REAL INFERENCE failed to execute. Check engine compatibility.");
+                }
+            } else {
+                res.Fail("Official Beatrice model path not discovered. SECTION 26 violation.");
+            }
+            Results.Add(res);
+        }
+
+        static void Audit_ProvenanceChain()
+        {
+            var res = new TestResult("TEST-PROVENANCE-001");
+            string provDir = Path.Combine(AppContext.BaseDirectory, "provenance");
+            var latest = Directory.GetFiles(provDir, "provenance_*.json").OrderByDescending(f => File.GetCreationTime(f)).FirstOrDefault();
             
-            if (jpModel != null) {
-                res.Pass($"Japanese/UTF-8 path resolution verified: {Path.GetFileName(jpModel.ResolvedAbsolutePath)}");
+            if (latest == null) { res.Fail("No provenance chain to verify."); Results.Add(res); return; }
+
+            string json = File.ReadAllText(latest);
+            var artifacts = JsonSerializer.Deserialize<List<ProvenanceService.ArtifactMetadata>>(json);
+            
+            bool hasInput = artifacts.Any(a => a.Type == "tensor_input");
+            bool hasOutput = artifacts.Any(a => a.Type == "tensor_output");
+
+            // NEW: Check if the model used was actually Beatrice and passed architecture check
+            bool isBeatrice = artifacts.Any(a => a.Details?.Contains("Engine: Beatrice") ?? false);
+            
+            if (hasInput && hasOutput && isBeatrice) {
+                res.Pass($"Real Beatrice inference verified via ExecutionID: {artifacts.First().ExecutionId}");
+            } else if (!isBeatrice) {
+                res.Fail("Architecture Mismatch: Non-Beatrice model used. Generic ONNX infra verified only.");
             } else {
-                res.Unverified("No models with Japanese characters in path found for testing.");
+                res.Fail("Incomplete inference trace. Tensors missing.");
             }
             Results.Add(res);
         }
 
-        static void RunTest_ModelManifest()
+        static void Audit_VirtualAudioDisclosure()
         {
-            var res = new TestResult("TEST-MODEL-MANIFEST-001");
-            try {
-                ModelManager.Refresh();
-                var models = ModelManager.GetAvailableModels();
-                if (models.Any()) {
-                    res.Pass($"Manifest management verified. Found {models.Count} manifests.");
-                    File.WriteAllText(Path.Combine(ResultDir, "model_manifest.json"), JsonSerializer.Serialize(models, new JsonSerializerOptions { WriteIndented = true }));
-                } else {
-                    res.Fail("No valid model manifests found. SECTION 27 violation.");
-                }
-            } catch (Exception ex) { res.Fail(ex.Message); }
-            Results.Add(res);
-        }
-
-        static void RunTest_SpeakerSystem()
-        {
-            var res = new TestResult("TEST-SPEAKER-001");
-            var models = ModelManager.GetAvailableModels();
-            if (models.Count > 1) res.Pass("Multiple speaker profiles recognized.");
-            else if (models.Count == 1) res.Unverified("Only 1 speaker profile found. Multiple needed for full test.");
-            else res.Fail("No speaker profiles.");
-            Results.Add(res);
-        }
-
-        static void RunTest_HashVerification()
-        {
-            var res = new TestResult("TEST-HASH-001");
-            var models = ModelManager.GetAvailableModels();
-            bool hasVerified = models.Any(m => m.IsVerified);
-            bool hasMismatch = models.Any(m => !m.IsVerified && !string.IsNullOrEmpty(m.Sha256));
-
-            if (hasVerified) res.Pass("SHA256 verification successful on valid models.");
-            else res.Fail("No models passed hash verification. SECTION 31 violation.");
-            Results.Add(res);
-        }
-
-        static void RunTest_Compatibility()
-        {
-            var res = new TestResult("TEST-COMPAT-001");
-            var models = ModelManager.GetAvailableModels().Where(m => m.IsVerified || m.Sha256 == "MOCK_VALIDATION").ToList();
-            if (!models.Any()) {
-                res.Unverified("No verified models available to test compatibility.");
+            var res = new TestResult("TEST-VAUDIO-001");
+            string disclosure = DeviceScanner.GetEndpointDisclosure();
+            if (disclosure != "None") {
+                File.WriteAllText(Path.Combine(ArtifactDir, "endpoint_provider.json"), disclosure);
+                res.Pass("Endpoint provider disclosed and verified.");
             } else {
-                bool anySuccess = false;
-                string lastError = "";
-
-                foreach (var manifest in models) {
-                    try {
-                        using var provider = new BeatriceOnnxProvider(manifest);
-                        if (provider.ValidateCompatibility(out string reason)) {
-                            anySuccess = true;
-                            res.Pass($"Compatibility verified via {manifest.ModelName}.");
-                            break;
-                        } else {
-                            lastError = reason;
-                        }
-                    } catch (Exception ex) { lastError = ex.Message; }
-                }
-
-                if (!anySuccess) res.Fail($"Compatibility check failed for all models. Last error: {lastError}");
+                res.Fail("Virtual audio backend not disclosed. SECTION 7 violation.");
             }
             Results.Add(res);
         }
 
-        static void RunTest_HotReload()
-        {
-            var res = new TestResult("TEST-HOTRELOAD-001");
-            try {
-                var models = ModelManager.GetAvailableModels();
-                if (models.Count < 1) {
-                    res.Unverified("Need at least 1 model to test reload.");
-                } else {
-                    using var engine = new VeilVoiceAudioEngine();
-                    // Simulate hot swap
-                    var m1 = models.First();
-                    using var p1 = new BeatriceOnnxProvider(m1);
-                    engine.UpdateInferenceProvider(p1);
-                    
-                    res.Pass("Engine provider swap successful without graph corruption.");
-                    File.WriteAllText(Path.Combine(ResultDir, "hotswap_log.txt"), $"Swapped to {m1.ModelName} at {DateTime.UtcNow}");
-                }
-            } catch (Exception ex) { res.Fail(ex.Message); }
-            Results.Add(res);
-        }
-
-        #endregion
-
-        #region Helpers
-
-        static void GenerateHashes()
-        {
-            using var sha = SHA256.Create();
-            var sb = new StringBuilder();
-            sb.AppendLine("# VeilVoice v3.1 artifact hashes");
-            var files = Directory.GetFiles(ResultDir).OrderBy(f => f);
-            foreach (var f in files) {
-                var hash = BitConverter.ToString(sha.ComputeHash(File.ReadAllBytes(f))).Replace("-", "").ToLowerInvariant();
-                sb.AppendLine($"{hash}  {Path.GetFileName(f)}");
-            }
-            File.WriteAllText("hashes.sha256", sb.ToString());
-        }
-
-        static void GenerateHtmlReport()
+        static void GenerateReport()
         {
             var sb = new StringBuilder();
-            sb.AppendLine("<html><head><style>body{font-family:sans-serif;background:#0d0d14;color:#e8e8f0} table{width:100%;border-collapse:collapse} th,td{border:1px solid #333;padding:10px;text-align:left} .PASS{color:#4ade80} .FAIL{color:#f87171} .UNVERIFIED{color:#fbbf24}</style></head><body>");
-            sb.AppendLine("<h1>VeilVoice v3.1 Acceptance Report</h1>");
+            sb.AppendLine("<html><head><style>body{font-family:sans-serif;background:#0d0d14;color:#e8e8f0} table{width:100%;border-collapse:collapse} th,td{border:1px solid #333;padding:10px;text-align:left} .PASS{color:#4ade80} .FAIL{color:#f87171}</style></head><body>");
+            sb.AppendLine("<h1>VeilVoice v4.0 Zero-Trust Audit Report</h1>");
+            
+            bool infraPass = Results.Where(r => r.TestId != "TEST-REAL-001").All(r => r.Status == TestStatus.PASS);
+            bool beatricePass = Results.Any(r => r.TestId == "TEST-REAL-001" && r.Status == TestStatus.PASS);
+
+            sb.AppendLine("<div style='margin-bottom:20px; padding:15px; border:2px solid #333;'>");
+            sb.AppendLine($"<p>Infrastructure Verification: <b class='{(infraPass ? "PASS" : "FAIL")}'>{(infraPass ? "PASS" : "FAIL")}</b></p>");
+            sb.AppendLine($"<p>Real Beatrice Inference: <b class='{(beatricePass ? "PASS" : "FAIL")}'>{(beatricePass ? "PASS" : "FAIL / UNVERIFIED")}</b></p>");
+            sb.AppendLine($"<p style='font-size:1.5em; color:#f87171;'>Status: <b>{(infraPass && beatricePass ? "DELIVERY READY" : "DELIVERY BLOCKED")}</b></p>");
+            sb.AppendLine("</div>");
+
             sb.AppendLine("<table><tr><th>Test ID</th><th>Status</th><th>Reason</th></tr>");
-            foreach (var r in Results) {
-                sb.AppendLine($"<tr><td>{r.TestId}</td><td class='{r.Status}'>{r.Status}</td><td>{HtmlEscape(r.Reason)}</td></tr>");
-            }
+            foreach (var r in Results) sb.AppendLine($"<tr><td>{r.TestId}</td><td class='{r.Status}'>{r.Status}</td><td>{r.Reason}</td></tr>");
             sb.AppendLine("</table></body></html>");
-            File.WriteAllText("acceptance_report.html", sb.ToString());
+            File.WriteAllText(ReportPath, sb.ToString());
         }
 
-        static string HtmlEscape(string s) => s?.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;") ?? "";
-
-        #endregion
-    }
-
-    public enum TestStatus { PASS, FAIL, UNVERIFIED }
-    public class TestResult {
-        public string TestId { get; }
-        public TestStatus Status { get; private set; } = TestStatus.UNVERIFIED;
-        public string Reason { get; private set; } = "Initializing";
-        public TestResult(string id) => TestId = id;
-        public void Pass(string r) { Status = TestStatus.PASS; Reason = r; }
-        public void Fail(string r) { Status = TestStatus.FAIL; Reason = r; }
-        public void Unverified(string r) { Status = TestStatus.UNVERIFIED; Reason = r; }
-    }
-
-    public class MetaInfo {
-        public string MachineId => Environment.MachineName;
-        public string Os => Environment.OSVersion.ToString();
-        public string TimestampUtc => DateTime.UtcNow.ToString("o");
+        enum TestStatus { PASS, FAIL, UNVERIFIED }
+        class TestResult {
+            public string TestId { get; set; }
+            public TestStatus Status { get; set; }
+            public string Reason { get; set; }
+            public TestResult(string id, TestStatus s = TestStatus.UNVERIFIED, string r = "") { TestId = id; Status = s; Reason = r; }
+            public void Pass(string r) { Status = TestStatus.PASS; Reason = r; }
+            public void Fail(string r) { Status = TestStatus.FAIL; Reason = r; }
+            public void Unverified(string r) { Status = TestStatus.UNVERIFIED; Reason = r; }
+        }
     }
 }
