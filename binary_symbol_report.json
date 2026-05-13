@@ -1,0 +1,195 @@
+{
+  "timestamp": "2026-05-13T11:02:25.7831088Z",
+  "total_files_scanned": 46,
+  "forbidden_symbol_count": 2,
+  "details": [
+    {
+      "FileName": "Microsoft.ML.OnnxRuntime.dll",
+      "FoundSymbols": []
+    },
+    {
+      "FileName": "NAudio.Asio.dll",
+      "FoundSymbols": []
+    },
+    {
+      "FileName": "NAudio.Core.dll",
+      "FoundSymbols": []
+    },
+    {
+      "FileName": "NAudio.dll",
+      "FoundSymbols": []
+    },
+    {
+      "FileName": "NAudio.Midi.dll",
+      "FoundSymbols": []
+    },
+    {
+      "FileName": "NAudio.Wasapi.dll",
+      "FoundSymbols": []
+    },
+    {
+      "FileName": "NAudio.WinForms.dll",
+      "FoundSymbols": []
+    },
+    {
+      "FileName": "NAudio.WinMM.dll",
+      "FoundSymbols": [
+        "Dummy"
+      ]
+    },
+    {
+      "FileName": "VeilVoice.dll",
+      "FoundSymbols": []
+    },
+    {
+      "FileName": "VeilVoice.exe",
+      "FoundSymbols": []
+    },
+    {
+      "FileName": "Microsoft.ML.OnnxRuntime.dll",
+      "FoundSymbols": []
+    },
+    {
+      "FileName": "NAudio.Asio.dll",
+      "FoundSymbols": []
+    },
+    {
+      "FileName": "NAudio.Core.dll",
+      "FoundSymbols": []
+    },
+    {
+      "FileName": "NAudio.dll",
+      "FoundSymbols": []
+    },
+    {
+      "FileName": "NAudio.Midi.dll",
+      "FoundSymbols": []
+    },
+    {
+      "FileName": "NAudio.Wasapi.dll",
+      "FoundSymbols": []
+    },
+    {
+      "FileName": "NAudio.WinForms.dll",
+      "FoundSymbols": []
+    },
+    {
+      "FileName": "NAudio.WinMM.dll",
+      "FoundSymbols": [
+        "Dummy"
+      ]
+    },
+    {
+      "FileName": "VeilVoice.dll",
+      "FoundSymbols": []
+    },
+    {
+      "FileName": "VeilVoice.exe",
+      "FoundSymbols": []
+    },
+    {
+      "FileName": "apphost.exe",
+      "FoundSymbols": []
+    },
+    {
+      "FileName": "VeilVoice.dll",
+      "FoundSymbols": []
+    },
+    {
+      "FileName": "apphost.exe",
+      "FoundSymbols": []
+    },
+    {
+      "FileName": "VeilVoice.dll",
+      "FoundSymbols": []
+    },
+    {
+      "FileName": "VeilVoiceBinaryInspector.dll",
+      "FoundSymbols": []
+    },
+    {
+      "FileName": "VeilVoiceBinaryInspector.exe",
+      "FoundSymbols": []
+    },
+    {
+      "FileName": "apphost.exe",
+      "FoundSymbols": []
+    },
+    {
+      "FileName": "VeilVoiceBinaryInspector.dll",
+      "FoundSymbols": []
+    },
+    {
+      "FileName": "VeilVoice.dll",
+      "FoundSymbols": []
+    },
+    {
+      "FileName": "VeilVoice.dll",
+      "FoundSymbols": []
+    },
+    {
+      "FileName": "VeilVoice.dll",
+      "FoundSymbols": []
+    },
+    {
+      "FileName": "VeilVoice.dll",
+      "FoundSymbols": []
+    },
+    {
+      "FileName": "VeilVoiceBinaryInspector.dll",
+      "FoundSymbols": []
+    },
+    {
+      "FileName": "VeilVoiceBinaryInspector.dll",
+      "FoundSymbols": []
+    },
+    {
+      "FileName": "onnxruntime.dll",
+      "FoundSymbols": []
+    },
+    {
+      "FileName": "onnxruntime_providers_shared.dll",
+      "FoundSymbols": []
+    },
+    {
+      "FileName": "onnxruntime.dll",
+      "FoundSymbols": []
+    },
+    {
+      "FileName": "onnxruntime_providers_shared.dll",
+      "FoundSymbols": []
+    },
+    {
+      "FileName": "onnxruntime.dll",
+      "FoundSymbols": []
+    },
+    {
+      "FileName": "onnxruntime_providers_shared.dll",
+      "FoundSymbols": []
+    },
+    {
+      "FileName": "onnxruntime.dll",
+      "FoundSymbols": []
+    },
+    {
+      "FileName": "onnxruntime_providers_shared.dll",
+      "FoundSymbols": []
+    },
+    {
+      "FileName": "onnxruntime.dll",
+      "FoundSymbols": []
+    },
+    {
+      "FileName": "onnxruntime_providers_shared.dll",
+      "FoundSymbols": []
+    },
+    {
+      "FileName": "onnxruntime.dll",
+      "FoundSymbols": []
+    },
+    {
+      "FileName": "onnxruntime_providers_shared.dll",
+      "FoundSymbols": []
+    }
+  ]
+}

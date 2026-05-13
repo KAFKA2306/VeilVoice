@@ -1,0 +1,140 @@
+<Window x:Class="VeilVoice.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="VeilVoice — Beatrice Voice Engine"
+        Height="620" Width="860"
+        Background="#0D0D14" WindowStyle="None" AllowsTransparency="True">
+    
+    <Window.Resources>
+        <Style x:Key="Label" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#666680"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Margin" Value="0,0,0,4"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+        </Style>
+        <Style x:Key="DarkCombo" TargetType="ComboBox">
+            <Setter Property="Background" Value="#1A1A2E"/>
+            <Setter Property="Foreground" Value="White"/>
+        </Style>
+        <Style x:Key="PrimaryBtn" TargetType="Button">
+            <Setter Property="Background" Value="#7C3AED"/>
+            <Setter Property="Foreground" Value="White"/>
+        </Style>
+    </Window.Resources>
+
+    <Border CornerRadius="10" Background="#0D0D14" BorderBrush="#2D2D4A" BorderThickness="1">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="44"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <!-- Title Bar -->
+            <Border Grid.Row="0" Background="#13131F" MouseDown="TitleBar_MouseDown">
+                <Grid Margin="15,0">
+                    <TextBlock Text="VEILVOICE" Foreground="#A78BFA" FontWeight="Bold" VerticalAlignment="Center"/>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                        <Button x:Name="BtnMinimize" Content="-" Width="30" Click="BtnMinimize_Click" Background="Transparent" Foreground="White" BorderThickness="0"/>
+                        <Button x:Name="BtnClose" Content="X" Width="30" Click="BtnClose_Click" Background="Transparent" Foreground="White" BorderThickness="0"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- Main Content -->
+            <Grid Grid.Row="1" Margin="20">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="300"/>
+                    <ColumnDefinition Width="20"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="0">
+                    <!-- Status -->
+                    <Border Background="#13131F" CornerRadius="8" Padding="15" Margin="0,0,0,10">
+                        <StackPanel>
+                            <TextBlock Style="{StaticResource Label}" Text="ENGINE STATUS"/>
+                            <StackPanel Orientation="Horizontal">
+                                <Ellipse x:Name="StatusDot" Width="10" Height="10" Fill="Red" Margin="0,0,8,0"/>
+                                <TextBlock x:Name="TxtStatus" Text="Stopped" Foreground="White" FontWeight="Bold"/>
+                            </StackPanel>
+                            <TextBlock x:Name="TxtEngineTag" Text="BEATRICE" Foreground="#666680" FontSize="10" Margin="0,5,0,0"/>
+                            <TextBlock x:Name="TxtEngineMode" Text="Engine: --" Foreground="#666680" FontSize="10"/>
+                            <TextBlock x:Name="TxtLatency" Text="Latency: --" Foreground="#666680" FontSize="10"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Devices -->
+                    <Border Background="#13131F" CornerRadius="8" Padding="15" Margin="0,0,0,10">
+                        <StackPanel>
+                            <TextBlock Style="{StaticResource Label}" Text="INPUT DEVICE"/>
+                            <ComboBox x:Name="CbInput" Style="{StaticResource DarkCombo}" SelectionChanged="CbInput_SelectionChanged"/>
+                            <TextBlock x:Name="TxtInputStatus" Text="" FontSize="10" Foreground="#4ADE80" Margin="0,5,0,0"/>
+                            <ProgressBar x:Name="PbInput" Height="4" Margin="0,5,0,0" Foreground="#7C3AED" Background="#0D0D14" BorderThickness="0"/>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Background="#13131F" CornerRadius="8" Padding="15" Margin="0,0,0,10">
+                        <StackPanel>
+                            <TextBlock Style="{StaticResource Label}" Text="OUTPUT DEVICE"/>
+                            <ComboBox x:Name="CbOutput" Style="{StaticResource DarkCombo}" SelectionChanged="CbOutput_SelectionChanged"/>
+                            <TextBlock x:Name="TxtOutputStatus" Text="" FontSize="10" Foreground="#4ADE80" Margin="0,5,0,0"/>
+                            <ProgressBar x:Name="PbOutput" Height="4" Margin="0,5,0,0" Foreground="#4ADE80" Background="#0D0D14" BorderThickness="0"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Model -->
+                    <Border Background="#13131F" CornerRadius="8" Padding="15" Margin="0,0,0,10">
+                        <StackPanel>
+                            <TextBlock Style="{StaticResource Label}" Text="MODEL"/>
+                            <TextBlock x:Name="TxtModelStatus" Text="Not loaded" Foreground="Yellow" FontSize="11"/>
+                            <TextBlock x:Name="TxtModelHash" Text="" Foreground="#444" FontSize="9"/>
+                        </StackPanel>
+                    </Border>
+
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="10"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Button x:Name="BtnStart" Grid.Column="0" Content="START" Height="40" Style="{StaticResource PrimaryBtn}" Click="BtnStart_Click"/>
+                        <Button x:Name="BtnStop" Grid.Column="2" Content="STOP" Height="40" IsEnabled="False" Click="BtnStop_Click"/>
+                    </Grid>
+                </StackPanel>
+
+                <!-- Log Panel -->
+                <Grid Grid.Column="2">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
+                        <TextBlock Text="LOG" Style="{StaticResource Label}"/>
+                        <TextBlock x:Name="TxtLogCount" Text="0 lines" Foreground="#444" FontSize="10" Margin="10,0,0,0"/>
+                    </StackPanel>
+                    <Border Grid.Row="1" Background="#0A0A12" CornerRadius="8">
+                        <ScrollViewer x:Name="LogScroll">
+                            <TextBlock x:Name="TxtLog" Padding="10" FontFamily="Consolas" FontSize="11" Foreground="#888" TextWrapping="Wrap"/>
+                        </ScrollViewer>
+                    </Border>
+                    
+                    <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,10,0,0">
+                        <StackPanel Margin="0,0,20,0">
+                            <TextBlock Text="P95 LATENCY" Style="{StaticResource Label}"/>
+                            <TextBlock x:Name="TxtP95" Text="--" Foreground="#A78BFA" FontSize="16" FontWeight="Bold"/>
+                        </StackPanel>
+                        <StackPanel Margin="0,0,20,0">
+                            <TextBlock Text="IN" Style="{StaticResource Label}"/>
+                            <TextBlock x:Name="TxtInLevel" Text="--" Foreground="#7C3AED" FontSize="16" FontWeight="Bold"/>
+                        </StackPanel>
+                        <StackPanel>
+                            <TextBlock Text="OUT" Style="{StaticResource Label}"/>
+                            <TextBlock x:Name="TxtOutLevel" Text="--" Foreground="#4ADE80" FontSize="16" FontWeight="Bold"/>
+                        </StackPanel>
+                    </StackPanel>
+                </Grid>
+            </Grid>
+        </Grid>
+    </Border>
+</Window>

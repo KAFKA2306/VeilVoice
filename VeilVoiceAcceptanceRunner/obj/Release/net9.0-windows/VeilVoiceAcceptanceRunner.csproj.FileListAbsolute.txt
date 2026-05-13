@@ -1,0 +1,6 @@
+D:\projects\VeilVoice_Workspace\VeilVoiceAcceptanceRunner\obj\Release\net9.0-windows\VeilVoiceAcceptanceRunner.csproj.AssemblyReference.cache
+D:\projects\VeilVoice_Workspace\VeilVoiceAcceptanceRunner\obj\Release\net9.0-windows\VeilVoiceAcceptanceRunner.GeneratedMSBuildEditorConfig.editorconfig
+D:\projects\VeilVoice_Workspace\VeilVoiceAcceptanceRunner\obj\Release\net9.0-windows\VeilVoiceAcceptanceRunner.AssemblyInfoInputs.cache
+D:\projects\VeilVoice_Workspace\VeilVoiceAcceptanceRunner\obj\Release\net9.0-windows\VeilVoiceAcceptanceRunner.AssemblyInfo.cs
+D:\projects\VeilVoice_Workspace\VeilVoiceAcceptanceRunner\obj\Release\net9.0-windows\VeilVoiceAcceptanceRunner.csproj.CoreCompileInputs.cache
+D:\projects\VeilVoice_Workspace\VeilVoiceAcceptanceRunner\obj\Release\net9.0-windows\VeilVoiceAcceptanceRunner.sourcelink.json
