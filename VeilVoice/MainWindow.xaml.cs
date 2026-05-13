@@ -18,11 +18,9 @@ namespace VeilVoice
         private VeilVoiceAudioEngine? _engine;
         private IInferenceProvider? _provider;
         private VeilVoiceConfig _config;
-
         private readonly DispatcherTimer _uiTimer = new() { Interval = TimeSpan.FromMilliseconds(80) };
         private readonly List<string> _logLines = new();
         private const int MaxLogLines = 500;
-
         private List<MMDevice> _inputDevices = new();
         private List<MMDevice> _outputDevices = new();
         private List<ModelManifest> _availableModels = new();
@@ -30,162 +28,93 @@ namespace VeilVoice
         public MainWindow()
         {
             InitializeComponent();
-            CrashRecoveryService.Register();
             _config = ConfigPersistenceService.Load();
             LogService.OnMessage += AppendLog;
-
             RefreshDevices();
             RefreshModels();
-
             _uiTimer.Tick += UiTimer_Tick;
             _uiTimer.Start();
-
-            AppendLog("[VeilVoice] Ready. Contract v3.1 Model System Active.");
+            AppendLog("[VeilVoice] Ready.");
         }
 
         private void RefreshDevices()
         {
-            try
-            {
-                _inputDevices = DeviceScanner.GetInputDevices();
-                _outputDevices = DeviceScanner.GetOutputDevices();
-
-                CbInput.Items.Clear();
-                foreach (var d in _inputDevices) CbInput.Items.Add(d.FriendlyName);
-
-                CbOutput.Items.Clear();
-                foreach (var d in _outputDevices) CbOutput.Items.Add(d.FriendlyName);
-
-                // Auto-select
-                var fifine = _inputDevices.FirstOrDefault(d => d.FriendlyName.Contains("FIFINE", StringComparison.OrdinalIgnoreCase));
-                if (fifine != null) CbInput.SelectedIndex = _inputDevices.IndexOf(fifine);
-                
-                var vvo = _outputDevices.FirstOrDefault(d => d.FriendlyName.Contains("VeilVoiceOut", StringComparison.OrdinalIgnoreCase));
-                if (vvo != null) CbOutput.SelectedIndex = _outputDevices.IndexOf(vvo);
-            }
-            catch (Exception ex) { AppendLog($"[ERROR] Device refresh failed: {ex.Message}"); }
+            _inputDevices = DeviceScanner.GetInputDevices();
+            _outputDevices = DeviceScanner.GetOutputDevices();
+            CbInput.Items.Clear();
+            foreach (var d in _inputDevices) CbInput.Items.Add(d.FriendlyName);
+            CbOutput.Items.Clear();
+            foreach (var d in _outputDevices) CbOutput.Items.Add(d.FriendlyName);
+            var fifine = _inputDevices.FirstOrDefault(d => d.FriendlyName.Contains("FIFINE", StringComparison.OrdinalIgnoreCase));
+            if (fifine != null) CbInput.SelectedIndex = _inputDevices.IndexOf(fifine);
+            var vvo = _outputDevices.FirstOrDefault(d => d.FriendlyName.Contains("VeilVoiceOut", StringComparison.OrdinalIgnoreCase));
+            if (vvo != null) CbOutput.SelectedIndex = _outputDevices.IndexOf(vvo);
         }
 
         private void RefreshModels()
         {
-            try
+            _availableModels = ModelManager.GetAvailableModels().ToList();
+            CbModels.Items.Clear();
+            foreach (var m in _availableModels) CbModels.Items.Add($"{m.ModelName} ({m.SpeakerId})");
+            if (_availableModels.Any())
             {
-                _availableModels = ModelManager.GetAvailableModels().ToList();
-                CbModels.Items.Clear();
-                foreach (var m in _availableModels)
-                {
-                    CbModels.Items.Add($"{m.ModelName} ({m.SpeakerId})");
-                }
-
-                if (_availableModels.Any())
-                {
-                    // Select first or previously used
-                    CbModels.SelectedIndex = 0;
-                }
-                else
-                {
-                    TxtModelStatus.Text = "[!] No manifests found. Check /models folder.";
-                    TxtModelStatus.Foreground = new SolidColorBrush(Color.FromRgb(0xFB, 0xBF, 0x24));
-                }
-                
-                AppendLog($"[Models] Found {_availableModels.Count} model manifests.");
+                CbModels.SelectedIndex = 0;
             }
-            catch (Exception ex) { AppendLog($"[ERROR] Model refresh failed: {ex.Message}"); }
+            else
+            {
+                TxtModelStatus.Text = "No manifests found.";
+                TxtModelStatus.Foreground = new SolidColorBrush(Color.FromRgb(0xFB, 0xBF, 0x24));
+            }
         }
 
         private void CbModels_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
         {
             if (CbModels.SelectedIndex < 0) return;
-
             var manifest = _availableModels[CbModels.SelectedIndex];
             UpdateModelInfoUI(manifest);
-
-            // If engine is running, hot-swap! (Contract SECTION 33)
-            if (_engine != null && _engine.IsRunning)
-            {
-                TryLoadModel(manifest);
-            }
+            if (_engine != null && _engine.IsRunning) TryLoadModel(manifest);
         }
 
         private void UpdateModelInfoUI(ModelManifest manifest)
         {
             TxtModelStatus.Text = $"{manifest.ModelName} ({manifest.Engine})";
             TxtModelHash.Text = $"SHA256: {(manifest.Sha256.Length > 16 ? manifest.Sha256.Substring(0, 16) + "..." : manifest.Sha256)}";
-            
             BdrModelBadge.Visibility = Visibility.Visible;
-            if (manifest.IsVerified)
-            {
-                TxtModelBadge.Text = "VERIFIED";
-                TxtModelBadge.Foreground = new SolidColorBrush(Color.FromRgb(0x4A, 0xDE, 0x80));
-            }
-            else
-            {
-                TxtModelBadge.Text = "HASH MISMATCH";
-                TxtModelBadge.Foreground = new SolidColorBrush(Color.FromRgb(0xF8, 0x71, 0x71));
-            }
+            TxtModelBadge.Text = manifest.IsVerified ? "VERIFIED" : "HASH MISMATCH";
+            TxtModelBadge.Foreground = new SolidColorBrush(manifest.IsVerified ? Color.FromRgb(0x4A, 0xDE, 0x80) : Color.FromRgb(0xF8, 0x71, 0x71));
         }
 
-        private void BtnScanModels_Click(object sender, RoutedEventArgs e)
-        {
-            RefreshModels();
-            AppendLog("[ModelManager] Scan complete.");
-        }
+        private void BtnScanModels_Click(object sender, RoutedEventArgs e) => RefreshModels();
 
         private void BtnStart_Click(object sender, RoutedEventArgs e)
         {
-            if (CbInput.SelectedIndex < 0 || CbOutput.SelectedIndex < 0)
-            {
-                AppendLog("[ERROR] Select input and output devices first.");
-                return;
-            }
-
-            try
-            {
-                var inputDevice = _inputDevices[CbInput.SelectedIndex];
-                var outputDevice = _outputDevices[CbOutput.SelectedIndex];
-
-                // Load selected model first
-                if (CbModels.SelectedIndex >= 0)
-                {
-                    var manifest = _availableModels[CbModels.SelectedIndex];
-                    TryLoadModel(manifest);
-                }
-
-                _engine?.Dispose();
-                _engine = new VeilVoiceAudioEngine(_provider);
-                _engine.StatusChanged += s => Dispatcher.InvokeAsync(() => UpdateStatus(s));
-                _engine.Start(inputDevice, outputDevice);
-
-                BtnStart.IsEnabled = false;
-                BtnStop.IsEnabled = true;
-                AppendLog($"[Engine] Started.");
-            }
-            catch (Exception ex) { AppendLog($"[ERROR] Start failed: {ex.Message}"); }
+            if (CbInput.SelectedIndex < 0 || CbOutput.SelectedIndex < 0) return;
+            var inputDevice = _inputDevices[CbInput.SelectedIndex];
+            var outputDevice = _outputDevices[CbOutput.SelectedIndex];
+            if (CbModels.SelectedIndex >= 0) TryLoadModel(_availableModels[CbModels.SelectedIndex]);
+            _engine?.Dispose();
+            _engine = new VeilVoiceAudioEngine(_provider);
+            _engine.StatusChanged += s => Dispatcher.InvokeAsync(() => UpdateStatus(s));
+            _engine.Start(inputDevice, outputDevice);
+            BtnStart.IsEnabled = false;
+            BtnStop.IsEnabled = true;
         }
 
         private void TryLoadModel(ModelManifest manifest)
         {
-            try
+            var nextProvider = new BeatriceOnnxProvider(manifest);
+            if (nextProvider.IsReady)
             {
-                var nextProvider = new BeatriceOnnxProvider(manifest);
-                if (nextProvider.IsReady)
-                {
-                    if (_engine != null && _engine.IsRunning)
-                    {
-                        _engine.UpdateInferenceProvider(nextProvider);
-                    }
-                    _provider?.Dispose();
-                    _provider = nextProvider;
-                    AppendLog($"[Model] Loaded: {manifest.ModelName}");
-                }
-                else
-                {
-                    AppendLog($"[ERROR] Model load failed: {nextProvider.StatusMessage}");
-                    // Keep old provider if hot-swapping
-                    if (_engine == null || !_engine.IsRunning) _provider = nextProvider;
-                }
+                if (_engine != null && _engine.IsRunning) _engine.UpdateInferenceProvider(nextProvider);
+                _provider?.Dispose();
+                _provider = nextProvider;
+                AppendLog($"[Model] Loaded: {manifest.ModelName}");
             }
-            catch (Exception ex) { AppendLog($"[CRASH] Model load error: {ex.Message}"); }
+            else
+            {
+                AppendLog($"[ERROR] {nextProvider.StatusMessage}");
+                if (_engine == null || !_engine.IsRunning) _provider = nextProvider;
+            }
         }
 
         private void BtnStop_Click(object sender, RoutedEventArgs e)
@@ -227,13 +156,13 @@ namespace VeilVoice
         }
 
         private void BtnClearLog_Click(object sender, RoutedEventArgs e) { _logLines.Clear(); TxtLog.Text = ""; }
+
         private void CbInput_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
         {
             if (CbInput.SelectedIndex >= 0 && CbInput.SelectedIndex < _inputDevices.Count)
             {
                 var d = _inputDevices[CbInput.SelectedIndex];
-                bool isFifine = d.FriendlyName.Contains("FIFINE", StringComparison.OrdinalIgnoreCase);
-                AppendLog($"[Devices] Input selected: {d.FriendlyName} {(isFifine ? "(FIFINE)" : "")}");
+                AppendLog($"[Devices] Input selected: {d.FriendlyName}");
             }
         }
 
@@ -242,8 +171,7 @@ namespace VeilVoice
             if (CbOutput.SelectedIndex >= 0 && CbOutput.SelectedIndex < _outputDevices.Count)
             {
                 var d = _outputDevices[CbOutput.SelectedIndex];
-                bool isVVO = d.FriendlyName.Contains("VeilVoiceOut", StringComparison.OrdinalIgnoreCase);
-                AppendLog($"[Devices] Output selected: {d.FriendlyName} {(isVVO ? "(VeilVoiceOut)" : "")}");
+                AppendLog($"[Devices] Output selected: {d.FriendlyName}");
             }
         }
 

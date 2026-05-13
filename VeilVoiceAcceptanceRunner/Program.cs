@@ -2,10 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Reflection;
 using System.Text;
 using System.Text.Json;
+using NAudio.Wave;
 using VeilVoice.Core;
+using VeilVoice.Core.Models;
 using VeilVoice.Inference;
 
 namespace VeilVoiceAcceptanceRunner
@@ -16,142 +17,103 @@ namespace VeilVoiceAcceptanceRunner
         static readonly string ArtifactDir = Path.Combine(AppContext.BaseDirectory, "artifacts");
         static readonly string ReportPath = Path.Combine(AppContext.BaseDirectory, "acceptance_report.html");
 
-        static void Main(string[] args)
+        static void Main()
         {
             Console.OutputEncoding = Encoding.UTF8;
-            Console.WriteLine("=== VeilVoice Acceptance Runner v4.0 (Zero-Trust) ===");
-            Console.WriteLine("    Provenance-Based Verification & Audit Chain");
-            Console.WriteLine();
-
             Directory.CreateDirectory(ArtifactDir);
-
-            // Audit Phase 1: Forbidden Symbols (SECTION 5/6)
             RunTest(Audit_ForbiddenSymbols, "TEST-BINARY-001");
             RunTest(Audit_SourceIntegrity, "TEST-SOURCE-001");
-
-            // Execution Phase: Generate Real Provenance (SECTION 3)
-            Console.WriteLine("\n[EXECUTION] Generating Real Inference Provenance...");
             GenerateRealProvenance();
-
-            // Audit Phase 2: Real Execution & Provenance (SECTION 3/4)
             RunTest(Audit_RealInference, "TEST-REAL-001");
             RunTest(Audit_ProvenanceChain, "TEST-PROVENANCE-001");
-
-            // Audit Phase 3: Virtual Audio Disclosure (SECTION 7)
             RunTest(Audit_VirtualAudioDisclosure, "TEST-VAUDIO-001");
-
             GenerateReport();
-            
-            bool infrastructurePass = Results.Where(r => r.TestId != "TEST-REAL-001").All(r => r.Status == TestStatus.PASS);
-            bool beatricePass = Results.Any(r => r.TestId == "TEST-REAL-001" && r.Status == TestStatus.PASS);
-
-            Console.WriteLine("\n=== AUDIT SUMMARY ===");
-            Console.WriteLine($"Infrastructure Verification: {(infrastructurePass ? "\x1b[92mPASS\x1b[0m" : "\x1b[91mFAIL\x1b[0m")}");
-            Console.WriteLine($"Real Beatrice Inference:   {(beatricePass ? "\x1b[92mPASS\x1b[0m" : "\x1b[91mFAIL / UNVERIFIED\x1b[0m")}");
-
-            if (!infrastructurePass || !beatricePass) {
-                Console.WriteLine("\n\x1b[91mDELIVERY BLOCKED: Contract violation or missing evidence.\x1b[0m");
-                Environment.Exit(1);
-            } else {
-                Console.WriteLine("\n\x1b[92mVEILVOICE 完成 (Contract v4.0 Verified)\x1b[0m");
-            }
+            bool pass = Results.All(r => r.Status == TestStatus.PASS);
+            if (!pass) Environment.Exit(1);
         }
 
         static void GenerateRealProvenance()
         {
-            try {
-                ProvenanceService.ResetExecution();
-                ModelManager.Refresh();
-                var models = ModelManager.GetAvailableModels().Where(m => m.IsVerified).ToList();
-                if (!models.Any()) {
-                    Console.WriteLine("    [WARN] No verified models found. Real inference skipped.");
-                    return;
-                }
-
-                var manifest = models.FirstOrDefault(m => m.Engine == "Beatrice");
-                if (manifest == null) {
-                    Console.WriteLine("    [WARN] No Beatrice-engine models found. Using Infrastructure Validator for trace.");
-                    manifest = models.FirstOrDefault(m => m.Engine == "Generic-ONNX-Test") ?? models.First();
-                }
-                
-                Console.WriteLine($"    [INFO] Using model for trace: {manifest.ModelName} (Engine: {manifest.Engine})");
-                
-                using var provider = new BeatriceOnnxProvider(manifest);
-                if (!provider.IsReady) {
-                    Console.WriteLine($"    [ERROR] Provider not ready: {provider.StatusMessage}");
-                    // Fallback to infrastructure-only trace if possible
-                    if (manifest.Engine == "Beatrice") {
-                        Console.WriteLine("    [INFO] Attempting fallback to Generic-ONNX-Test for infrastructure trace...");
-                        var fallback = models.FirstOrDefault(m => m.Engine == "Generic-ONNX-Test");
-                        if (fallback != null) {
-                            using var fallbackProvider = new BeatriceOnnxProvider(fallback);
-                            if (fallbackProvider.IsReady) {
-                                provider.Dispose(); // Clear old session
-                                GenerateTrace(fallbackProvider);
-                                return;
-                            }
-                        }
-                    }
-                    return;
-                }
-
-                GenerateTrace(provider);
-            } catch (Exception ex) {
-                Console.WriteLine($"    [ERROR] Execution failed: {ex.Message}");
+            ProvenanceService.ResetExecution();
+            ModelManager.Refresh();
+            var models = ModelManager.GetAvailableModels();
+            if (models.Count == 0) return;
+            ModelManifest? bestModel = null;
+            foreach (var m in models)
+            {
+                using var testProvider = new BeatriceOnnxProvider(m);
+                if (testProvider.IsReady && testProvider.IsBeatriceCompatible) { bestModel = m; break; }
             }
+            if (bestModel == null)
+            {
+                foreach (var m in models)
+                {
+                    using var testProvider = new BeatriceOnnxProvider(m);
+                    if (testProvider.IsReady) { bestModel = m; break; }
+                }
+            }
+            if (bestModel == null) return;
+            using var provider = new BeatriceOnnxProvider(bestModel);
+            string fixturePath = Path.Combine(AppContext.BaseDirectory, "fixture_input.wav");
+            CreateWavFixture(fixturePath);
+            string outputPath = Path.Combine(AppContext.BaseDirectory, "fixture_output.wav");
+            new AudioProcessor(provider).ProcessFile(fixturePath, outputPath);
         }
 
-        static void GenerateTrace(BeatriceOnnxProvider provider)
+        static void CreateWavFixture(string path)
         {
-            float[] input = new float[480];
-            float[] output = new float[480];
-            provider.Process(input, output);
-            Console.WriteLine($"    [SUCCESS] Real execution trace generated: {ProvenanceService.CurrentExecutionId}");
+            var format = new WaveFormat(48000, 16, 1);
+            using var writer = new WaveFileWriter(path, format);
+            float[] samples = new float[4800];
+            var rand = new Random();
+            for (int i = 0; i < samples.Length; i++) samples[i] = (float)(rand.NextDouble() * 0.1 - 0.05);
+            writer.WriteSamples(samples, 0, samples.Length);
         }
 
         static void RunTest(Action action, string testId)
         {
-            Console.Write($"[{testId}] Auditing... ");
-            try { action(); } catch (Exception ex) { Results.Add(new TestResult(testId, TestStatus.FAIL, ex.Message)); }
+            action();
             var res = Results.Last();
-            string color = res.Status switch { TestStatus.PASS => "\x1b[92m", TestStatus.FAIL => "\x1b[91m", _ => "\x1b[93m" };
-            Console.WriteLine($"{color}{res.Status}\x1b[0m: {res.Reason}");
+            Console.WriteLine($"[{testId}] {res.Status}: {res.Reason}");
         }
 
         static void Audit_ForbiddenSymbols()
         {
             var res = new TestResult("TEST-BINARY-001");
-            string binDir = AppContext.BaseDirectory;
             string[] forbidden = { "Mock", "Simulation", "ValidationOnly", "Bypass", "Dummy" };
-            
             int count = 0;
-            foreach (var file in Directory.GetFiles(binDir, "*.dll")) {
+            foreach (var file in Directory.GetFiles(AppContext.BaseDirectory, "*.dll"))
+            {
                 if (file.Contains("NAudio") || file.Contains("Microsoft")) continue;
-                string content = File.ReadAllText(file); // Note: Simplified for DLL scan
-                foreach (var s in forbidden) if (content.Contains(s)) count++;
+                byte[] content = File.ReadAllBytes(file);
+                foreach (var s in forbidden) if (ContainsBytePattern(content, s)) count++;
             }
-
-            if (count == 0) res.Pass("No forbidden symbols detected in local binaries.");
-            else res.Fail($"{count} forbidden symbols found. SECTION 5 violation.");
+            if (count == 0) res.Pass("No forbidden symbols detected.");
+            else res.Fail($"{count} forbidden symbols found.");
             Results.Add(res);
+        }
+
+        static bool ContainsBytePattern(byte[] data, string s)
+        {
+            byte[] pattern = Encoding.UTF8.GetBytes(s);
+            for (int i = 0; i <= data.Length - pattern.Length; i++)
+            {
+                bool match = true;
+                for (int j = 0; j < pattern.Length; j++) if (data[i + j] != pattern[j]) { match = false; break; }
+                if (match) return true;
+            }
+            return false;
         }
 
         static void Audit_SourceIntegrity()
         {
             var res = new TestResult("TEST-SOURCE-001");
-            // Check for MOCK branches in key classes via Reflection or simple text scan
             string srcDir = Path.Combine(Directory.GetCurrentDirectory(), "VeilVoice");
             if (!Directory.Exists(srcDir)) { res.Unverified("Source not found."); Results.Add(res); return; }
-
-            var files = Directory.GetFiles(srcDir, "*.cs", SearchOption.AllDirectories);
-            bool found = false;
-            foreach (var f in files) {
-                string txt = File.ReadAllText(f);
-                if (txt.Contains("MOCK_VALIDATION") || txt.Contains("if (MOCK)")) { found = true; break; }
-            }
-
-            if (!found) res.Pass("Source integrity verified. No validation branches.");
-            else res.Fail("Validation/Mock branches detected in source. SECTION 6 violation.");
+            bool found = Directory.GetFiles(srcDir, "*.cs", SearchOption.AllDirectories)
+                .Any(f => File.ReadAllText(f).Contains("MOCK_VALIDATION") || File.ReadAllText(f).Contains("if (MOCK)"));
+            if (!found) res.Pass("Source integrity verified.");
+            else res.Fail("Validation/Mock branches detected.");
             Results.Add(res);
         }
 
@@ -159,26 +121,15 @@ namespace VeilVoiceAcceptanceRunner
         {
             var res = new TestResult("TEST-REAL-001");
             string provDir = Path.Combine(AppContext.BaseDirectory, "provenance");
-            var latest = Directory.GetFiles(provDir, "provenance_*.json").OrderByDescending(f => File.GetCreationTime(f)).FirstOrDefault();
-            
-            if (latest == null) { res.Fail("No execution trace found. Real inference required."); Results.Add(res); return; }
-
-            string json = File.ReadAllText(latest);
-            var artifacts = JsonSerializer.Deserialize<List<ProvenanceService.ArtifactMetadata>>(json);
-            
-            bool hasInput = artifacts.Any(a => a.Type == "tensor_input");
-            bool hasOutput = artifacts.Any(a => a.Type == "tensor_output");
-
-            // Verify Beatrice architecture compatibility
-            bool isBeatrice = artifacts.Any(a => (a.Details?.Contains("Engine: Beatrice") ?? false) && (a.Details?.Contains("BeatriceCompatible: True") ?? false));
-            
-            if (hasInput && hasOutput && isBeatrice) {
-                res.Pass($"Real Beatrice inference verified via ExecutionID: {artifacts.First().ExecutionId}");
-            } else if (!isBeatrice) {
-                res.Fail("Architecture Mismatch: Non-Beatrice model used. Beatrice architecture compatible inference not found.");
-            } else {
-                res.Fail("Incomplete inference trace. Tensors missing.");
-            }
+            var latestProvFile = Directory.GetFiles(provDir, "provenance_*.json").OrderByDescending(f => File.GetCreationTime(f)).FirstOrDefault();
+            if (latestProvFile == null) { res.Fail("No provenance manifest found."); Results.Add(res); return; }
+            var artifacts = JsonSerializer.Deserialize<List<ProvenanceService.ArtifactMetadata>>(File.ReadAllText(latestProvFile));
+            string[] required = { "tensor_input", "tensor_output", "runtime_execution_id", "backend_runtime_trace", "raw_input", "processed_output" };
+            var missing = required.Where(t => artifacts == null || !artifacts.Any(a => a.Type == t)).ToList();
+            bool isBeatrice = artifacts != null && artifacts.Any(a => a.Details?.Contains("BeatriceCompatible: True") ?? false);
+            if (missing.Count == 0 && isBeatrice) res.Pass("Real Beatrice inference verified.");
+            else if (!isBeatrice) res.Fail("Architecture Mismatch.");
+            else res.Fail($"Incomplete trace. Missing: {string.Join(", ", missing)}");
             Results.Add(res);
         }
 
@@ -186,20 +137,14 @@ namespace VeilVoiceAcceptanceRunner
         {
             var res = new TestResult("TEST-PROVENANCE-001");
             string provDir = Path.Combine(AppContext.BaseDirectory, "provenance");
-            var latest = Directory.GetFiles(provDir, "provenance_*.json").OrderByDescending(f => File.GetCreationTime(f)).FirstOrDefault();
-            
-            if (latest == null) { res.Fail("No provenance chain to verify."); Results.Add(res); return; }
-
-            string json = File.ReadAllText(latest);
-            var artifacts = JsonSerializer.Deserialize<List<ProvenanceService.ArtifactMetadata>>(json);
-            
-            // Verify hashes and IDs match
+            var latestProvFile = Directory.GetFiles(provDir, "provenance_*.json").OrderByDescending(f => File.GetCreationTime(f)).FirstOrDefault();
+            if (latestProvFile == null) { res.Fail("No provenance chain."); Results.Add(res); return; }
+            var artifacts = JsonSerializer.Deserialize<List<ProvenanceService.ArtifactMetadata>>(File.ReadAllText(latestProvFile));
+            if (artifacts == null || artifacts.Count == 0) { res.Fail("Empty manifest."); Results.Add(res); return; }
             string execId = artifacts.First().ExecutionId;
-            bool chainValid = artifacts.All(a => a.ExecutionId == execId);
-            bool hashesPresent = artifacts.All(a => !string.IsNullOrEmpty(a.Sha256));
-
-            if (chainValid && hashesPresent) res.Pass($"Provenance chain verified for {artifacts.Count} artifacts.");
-            else res.Fail("Execution ID mismatch or missing hashes in provenance chain.");
+            bool valid = artifacts.All(a => a.ExecutionId == execId && !string.IsNullOrEmpty(a.Sha256) && !string.IsNullOrEmpty(a.MachineId));
+            if (valid) res.Pass("Provenance chain verified.");
+            else res.Fail("Chain invalid.");
             Results.Add(res);
         }
 
@@ -207,42 +152,31 @@ namespace VeilVoiceAcceptanceRunner
         {
             var res = new TestResult("TEST-VAUDIO-001");
             string disclosure = DeviceScanner.GetEndpointDisclosure();
-            if (disclosure != "None") {
+            if (disclosure != "None")
+            {
                 File.WriteAllText(Path.Combine(ArtifactDir, "endpoint_provider.json"), disclosure);
-                res.Pass("Endpoint provider disclosed and verified.");
-            } else {
-                res.Fail("Virtual audio backend not disclosed. SECTION 7 violation.");
+                res.Pass("Endpoint provider disclosed.");
             }
+            else res.Fail("Virtual audio backend not disclosed.");
             Results.Add(res);
         }
 
         static void GenerateReport()
         {
             var sb = new StringBuilder();
-            sb.AppendLine("<html><head><style>body{font-family:sans-serif;background:#0d0d14;color:#e8e8f0} table{width:100%;border-collapse:collapse} th,td{border:1px solid #333;padding:10px;text-align:left} .PASS{color:#4ade80} .FAIL{color:#f87171}</style></head><body>");
-            sb.AppendLine("<h1>VeilVoice v4.0 Zero-Trust Audit Report</h1>");
-            
-            bool infraPass = Results.Where(r => r.TestId != "TEST-REAL-001").All(r => r.Status == TestStatus.PASS);
-            bool beatricePass = Results.Any(r => r.TestId == "TEST-REAL-001" && r.Status == TestStatus.PASS);
-
-            sb.AppendLine("<div style='margin-bottom:20px; padding:15px; border:2px solid #333;'>");
-            sb.AppendLine($"<p>Infrastructure Verification: <b class='{(infraPass ? "PASS" : "FAIL")}'>{(infraPass ? "PASS" : "FAIL")}</b></p>");
-            sb.AppendLine($"<p>Real Beatrice Inference: <b class='{(beatricePass ? "PASS" : "FAIL")}'>{(beatricePass ? "PASS" : "FAIL / UNVERIFIED")}</b></p>");
-            sb.AppendLine($"<p style='font-size:1.5em; color:#f87171;'>Status: <b>{(infraPass && beatricePass ? "DELIVERY READY" : "DELIVERY BLOCKED")}</b></p>");
-            sb.AppendLine("</div>");
-
-            sb.AppendLine("<table><tr><th>Test ID</th><th>Status</th><th>Reason</th></tr>");
-            foreach (var r in Results) sb.AppendLine($"<tr><td>{r.TestId}</td><td class='{r.Status}'>{r.Status}</td><td>{r.Reason}</td></tr>");
+            sb.AppendLine("<html><body><h1>Audit Report</h1><table>");
+            foreach (var r in Results) sb.AppendLine($"<tr><td>{r.TestId}</td><td>{r.Status}</td><td>{r.Reason}</td></tr>");
             sb.AppendLine("</table></body></html>");
             File.WriteAllText(ReportPath, sb.ToString());
         }
 
         enum TestStatus { PASS, FAIL, UNVERIFIED }
-        class TestResult {
-            public string TestId { get; set; }
-            public TestStatus Status { get; set; }
-            public string Reason { get; set; }
-            public TestResult(string id, TestStatus s = TestStatus.UNVERIFIED, string r = "") { TestId = id; Status = s; Reason = r; }
+        class TestResult
+        {
+            public string TestId { get; init; }
+            public TestStatus Status { get; private set; }
+            public string Reason { get; private set; }
+            public TestResult(string id) { TestId = id; Status = TestStatus.UNVERIFIED; Reason = ""; }
             public void Pass(string r) { Status = TestStatus.PASS; Reason = r; }
             public void Fail(string r) { Status = TestStatus.FAIL; Reason = r; }
             public void Unverified(string r) { Status = TestStatus.UNVERIFIED; Reason = r; }

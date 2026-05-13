@@ -9,7 +9,16 @@ namespace VeilVoiceBinaryInspector
 {
     class Program
     {
-        static readonly string[] ForbiddenWords = { Encoding.UTF8.GetString(Convert.FromBase64String("TW9jaw==")), Encoding.UTF8.GetString(Convert.FromBase64String("RmFrZQ==")), Encoding.UTF8.GetString(Convert.FromBase64String("U3R1Yg==")), Encoding.UTF8.GetString(Convert.FromBase64String("RHVtbXk=")), Encoding.UTF8.GetString(Convert.FromBase64String("U2ltdWxhdGlvbg==")) };
+        static readonly string[] ForbiddenWords = { 
+            Encoding.UTF8.GetString(Convert.FromBase64String("TW9jaw==")),          // Mock
+            Encoding.UTF8.GetString(Convert.FromBase64String("RmFrZQ==")),          // Fake
+            Encoding.UTF8.GetString(Convert.FromBase64String("U3R1Yg==")),          // Stub
+            Encoding.UTF8.GetString(Convert.FromBase64String("RHVtbXk=")),          // Dummy
+            Encoding.UTF8.GetString(Convert.FromBase64String("U2ltdWxhdGlvbg==")),  // Simulation
+            Encoding.UTF8.GetString(Convert.FromBase64String("VmFsaWRhdGlvbk9ubHk=")), // ValidationOnly
+            Encoding.UTF8.GetString(Convert.FromBase64String("Q29tcGF0aWJpbGl0eU1vZGU=")), // CompatibilityMode
+            Encoding.UTF8.GetString(Convert.FromBase64String("QnlwYXNz"))           // Bypass
+        };
 
         static void Main(string[] args)
         {

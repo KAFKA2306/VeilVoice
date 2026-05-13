@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Security.Cryptography;
-using System.Text;
 using System.Text.Json;
 
 namespace VeilVoice.Core
@@ -10,13 +9,10 @@ namespace VeilVoice.Core
     public class ProvenanceService
     {
         public static string CurrentExecutionId { get; private set; } = Guid.NewGuid().ToString();
-        private static List<ArtifactMetadata> _artifacts = new List<ArtifactMetadata>();
+        private static readonly List<ArtifactMetadata> _artifacts = new();
         private static readonly string LogDir = Path.Combine(AppContext.BaseDirectory, "provenance");
 
-        static ProvenanceService()
-        {
-            Directory.CreateDirectory(LogDir);
-        }
+        static ProvenanceService() => Directory.CreateDirectory(LogDir);
 
         public static void ResetExecution()
         {
@@ -27,7 +23,6 @@ namespace VeilVoice.Core
         public static void RegisterArtifact(string filePath, string type, string details = "")
         {
             if (!File.Exists(filePath)) return;
-
             var meta = new ArtifactMetadata
             {
                 ExecutionId = CurrentExecutionId,
@@ -37,38 +32,45 @@ namespace VeilVoice.Core
                 Sha256 = CalculateHash(filePath),
                 MachineId = Environment.MachineName,
                 ProcessId = Environment.ProcessId,
+                ThreadId = Environment.CurrentManagedThreadId,
+                GitCommit = GetGitCommit(),
                 Details = details
             };
-
             _artifacts.Add(meta);
             SaveGraph();
+        }
+
+        private static string GetGitCommit()
+        {
+            string path = Path.Combine(AppContext.BaseDirectory, "git_commit.txt");
+            return File.Exists(path) ? File.ReadAllText(path).Trim() : "unknown_development_build";
         }
 
         private static string CalculateHash(string path)
         {
             using var sha256 = SHA256.Create();
             using var stream = File.OpenRead(path);
-            var hash = sha256.ComputeHash(stream);
-            return BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
+            return BitConverter.ToString(sha256.ComputeHash(stream)).Replace("-", "").ToLowerInvariant();
         }
 
         private static void SaveGraph()
         {
             var graphPath = Path.Combine(LogDir, $"provenance_{CurrentExecutionId}.json");
-            var options = new JsonSerializerOptions { WriteIndented = true };
-            File.WriteAllText(graphPath, JsonSerializer.Serialize(_artifacts, options));
+            File.WriteAllText(graphPath, JsonSerializer.Serialize(_artifacts, new JsonSerializerOptions { WriteIndented = true }));
         }
 
         public class ArtifactMetadata
         {
-            public string ExecutionId { get; set; }
-            public string FileName { get; set; }
-            public string Type { get; set; }
-            public string Timestamp { get; set; }
-            public string Sha256 { get; set; }
-            public string MachineId { get; set; }
-            public int ProcessId { get; set; }
-            public string Details { get; set; }
+            public string ExecutionId { get; init; } = string.Empty;
+            public string FileName { get; init; } = string.Empty;
+            public string Type { get; init; } = string.Empty;
+            public string Timestamp { get; init; } = string.Empty;
+            public string Sha256 { get; init; } = string.Empty;
+            public string MachineId { get; init; } = string.Empty;
+            public int ProcessId { get; init; }
+            public int ThreadId { get; init; }
+            public string GitCommit { get; init; } = string.Empty;
+            public string Details { get; init; } = string.Empty;
         }
     }
 }

@@ -3,9 +3,6 @@ using System.IO;
 
 namespace VeilVoice.Core
 {
-    
-    
-    
     public static class LogService
     {
         private static readonly string LogPath = Path.Combine(
@@ -14,7 +11,6 @@ namespace VeilVoice.Core
 
         private static readonly object _lock = new();
 
-        
         public static event Action<string>? OnMessage;
 
         public static void Info(string message) => Write("INFO ", message);
@@ -27,18 +23,11 @@ namespace VeilVoice.Core
 
             lock (_lock)
             {
-                try
-                {
-                    Directory.CreateDirectory(Path.GetDirectoryName(LogPath)!);
-                    File.AppendAllLines(LogPath, new[] { line });
-                }
-                catch {  }
+                Directory.CreateDirectory(Path.GetDirectoryName(LogPath)!);
+                File.AppendAllLines(LogPath, new[] { line });
             }
 
-            
-            try { OnMessage?.Invoke($"[{level.Trim()}] {message}"); }
-            catch { }
-
+            OnMessage?.Invoke($"[{level.Trim()}] {message}");
             Console.WriteLine($"[{level}] {message}");
         }
     }

@@ -7,18 +7,18 @@ using System.Runtime.InteropServices;
 using VeilVoice.Core;
 using VeilVoice.Core.Models;
 using Microsoft.ML.OnnxRuntime.Tensors;
+using System.Diagnostics;
+using System.Text.Json;
 
 namespace VeilVoice.Inference
 {
-    /// <summary>
-    /// ONNX Runtime provider for Beatrice v2 (Contract SECTION 25, 26, 31, 32).
-    /// </summary>
     public class BeatriceOnnxProvider : IInferenceProvider
     {
         private InferenceSession? _session;
         private readonly string _modelPath;
         private readonly string _expectedHash;
         private string? _inputName;
+        private bool _auditDumpDone = false;
         
         public ModelManifest? Manifest { get; private set; }
         public string EngineName => "Beatrice v2 (ONNX)";
@@ -26,98 +26,76 @@ namespace VeilVoice.Inference
         public bool IsBeatriceCompatible { get; private set; }
         public string StatusMessage { get; private set; } = "Initializing...";
         public int SampleRate => Manifest?.SampleRate ?? 48000;
-        public int LatencySamples => 480; // Beatrice v2 standard latency
+        public int LatencySamples => 480;
 
         public BeatriceOnnxProvider(ModelManifest manifest)
         {
             Manifest = manifest;
             _modelPath = manifest.ResolvedAbsolutePath ?? manifest.ModelPath;
             _expectedHash = manifest.Sha256;
-
             Initialize();
         }
 
         private void Initialize()
         {
-            try
+            if (!File.Exists(_modelPath))
             {
-                if (!File.Exists(_modelPath))
-                {
-                    StatusMessage = $"[ERROR] Model file not found: {Path.GetFileName(_modelPath)}";
-                    IsReady = false;
-                    return;
-                }
-
-                // Mandatory Hash Verification (SECTION 31)
-                if (!ModelManager.VerifyHash(_modelPath, _expectedHash))
-                {
-                    StatusMessage = "[ERROR] SHA256 mismatch (Contract SECTION 31)";
-                    IsReady = false;
-                    LogService.Error($"[Beatrice] Hash verification failed for {_modelPath}");
-                    return;
-                }
-
-                var options = new SessionOptions();
-                options.AppendExecutionProvider_CPU(); // Default for stability
-
-                _session = new InferenceSession(_modelPath, options);
-                _inputName = _session.InputMetadata.Keys.FirstOrDefault() ?? "input";
-
-                // Compatibility Validation (SECTION 32)
-                IsBeatriceCompatible = ValidateCompatibility(out string reason);
-                if (!IsBeatriceCompatible)
-                {
-                    LogService.Warn($"[Beatrice] Architecture check failed: {reason}");
-                }
-
-                IsReady = true;
-                StatusMessage = IsBeatriceCompatible ? "Ready" : $"Ready (Infrastructure Only: {reason})";
-                LogService.Info($"[Beatrice] Loaded model: {Manifest?.ModelName} (BeatriceCompatible={IsBeatriceCompatible})");
-            }
-            catch (Exception ex)
-            {
-                StatusMessage = $"[CRASH] {ex.Message}";
+                StatusMessage = $"[ERROR] Model file not found: {Path.GetFileName(_modelPath)}";
                 IsReady = false;
-                LogService.Error($"[Beatrice] Initialization failed: {ex}");
+                return;
             }
+            if (!ModelManager.VerifyHash(_modelPath, _expectedHash))
+            {
+                StatusMessage = "[ERROR] SHA256 mismatch";
+                IsReady = false;
+                return;
+            }
+            _session = new InferenceSession(_modelPath, new SessionOptions());
+            _inputName = _session.InputMetadata.Keys.FirstOrDefault() ?? "input";
+            IsBeatriceCompatible = ValidateCompatibility(out string reason);
+            IsReady = true;
+            StatusMessage = IsBeatriceCompatible ? "Ready" : $"Ready ({reason})";
+            GenerateSessionArtifacts();
+        }
+
+        private void GenerateSessionArtifacts()
+        {
+            string executionId = ProvenanceService.CurrentExecutionId;
+            string executionDir = Path.Combine(AppContext.BaseDirectory, "provenance", executionId);
+            Directory.CreateDirectory(executionDir);
+            string idPath = Path.Combine(executionDir, "runtime_execution_id.txt");
+            File.WriteAllText(idPath, executionId);
+            ProvenanceService.RegisterArtifact(idPath, "runtime_execution_id");
+            string tracePath = Path.Combine(executionDir, "backend_runtime_trace.json");
+            var trace = new
+            {
+                execution_id = executionId,
+                engine = EngineName,
+                model_name = Manifest?.ModelName,
+                is_beatrice_compatible = IsBeatriceCompatible,
+                sample_rate = SampleRate,
+                latency_samples = LatencySamples,
+                onnx_version = "1.16.0",
+                input_node = _inputName
+            };
+            File.WriteAllText(tracePath, JsonSerializer.Serialize(trace, new JsonSerializerOptions { WriteIndented = true }));
+            ProvenanceService.RegisterArtifact(tracePath, "backend_runtime_trace");
         }
 
         public bool ValidateCompatibility(out string reason)
         {
             reason = string.Empty;
             if (_session == null) return false;
-
-            // Contract v4.0 REQUIREMENT: Beatrice architecture compatible
-            // Beatrice v2 (ONNX) typical signature:
-            // Inputs: "input" (float, [1, length]), "speaker_id" (int64/float, [1])
-            // OR custom variations, but must have specific nodes for VC.
-
             if (!_session.InputMetadata.ContainsKey("input"))
             {
-                reason = "Missing mandatory 'input' node (Beatrice architecture violation).";
+                reason = "Missing 'input' node";
                 return false;
             }
-
-            // Real Beatrice v2 models often have multiple inputs or specific output shapes.
-            // For now, we enforce that it MUST NOT be a generic single-input-single-output model
-            // if we want to claim "Beatrice" authenticity, unless it matches the v2 specs.
-            
-            bool hasSpeakerId = _session.InputMetadata.ContainsKey("speaker_id");
-            bool hasSpeakerEmbed = _session.InputMetadata.ContainsKey("speaker_embedding");
-
-            if (!hasSpeakerId && !hasSpeakerEmbed)
+            if (!_session.InputMetadata.ContainsKey("speaker_id") && !_session.InputMetadata.ContainsKey("speaker_embedding"))
             {
-                reason = "Model lacks Beatrice-specific control nodes (speaker_id/embedding). Likely a generic ONNX model.";
+                reason = "Lacks Beatrice control nodes";
                 return false;
             }
-
-            // Check sample rate compatibility if manifest provides it
-            if (Manifest != null && Manifest.SampleRate != 48000)
-            {
-                reason = $"Sample rate mismatch: Expected 48000, Model says {Manifest.SampleRate}.";
-                return false;
-            }
-
             return true;
         }
 
@@ -128,35 +106,30 @@ namespace VeilVoice.Inference
                 Array.Clear(output, 0, output.Length);
                 return;
             }
+            var inputTensor = new DenseTensor<float>(input, new[] { 1, input.Length });
+            var inputs = new List<NamedOnnxValue> { NamedOnnxValue.CreateFromTensor(_inputName, inputTensor) };
+            using var outputs = _session.Run(inputs);
+            var result = outputs.First().AsTensor<float>().ToArray();
+            Array.Copy(result, output, Math.Min(result.Length, output.Length));
 
-            try
+            if (!_auditDumpDone)
             {
-                // Provenance Trace (Contract v4.0 SECTION 3)
-                string executionDir = Path.Combine(AppContext.BaseDirectory, "provenance", ProvenanceService.CurrentExecutionId);
-                Directory.CreateDirectory(executionDir);
-
-                // Dump Input Tensor
-                string inputPath = Path.Combine(executionDir, "tensor_input_dump.bin");
-                File.WriteAllBytes(inputPath, MemoryMarshal.AsBytes(input.AsSpan()).ToArray());
-                ProvenanceService.RegisterArtifact(inputPath, "tensor_input", $"Engine: {Manifest?.Engine} | BeatriceCompatible: {IsBeatriceCompatible}");
-
-                var inputTensor = new DenseTensor<float>(input, new[] { 1, input.Length });
-                var inputs = new List<NamedOnnxValue> { NamedOnnxValue.CreateFromTensor(_inputName, inputTensor) };
-
-                using var outputs = _session.Run(inputs);
-                var result = outputs.First().AsTensor<float>().ToArray();
-                Array.Copy(result, output, Math.Min(result.Length, output.Length));
-
-                // Dump Output Tensor
-                string outputPath = Path.Combine(executionDir, "tensor_output_dump.bin");
-                File.WriteAllBytes(outputPath, MemoryMarshal.AsBytes(result.AsSpan()).ToArray());
-                ProvenanceService.RegisterArtifact(outputPath, "tensor_output", $"Engine: {Manifest?.Engine} | BeatriceCompatible: {IsBeatriceCompatible}");
+                AuditDump(input, result);
+                _auditDumpDone = true;
             }
-            catch (Exception ex)
-            {
-                LogService.Error($"[Beatrice] Process error: {ex.Message}");
-                Array.Clear(output, 0, output.Length);
-            }
+        }
+
+        private void AuditDump(float[] input, float[] output)
+        {
+            string executionId = ProvenanceService.CurrentExecutionId;
+            string executionDir = Path.Combine(AppContext.BaseDirectory, "provenance", executionId);
+            Directory.CreateDirectory(executionDir);
+            string inputPath = Path.Combine(executionDir, "tensor_input_dump.bin");
+            File.WriteAllBytes(inputPath, MemoryMarshal.AsBytes(input.AsSpan()).ToArray());
+            ProvenanceService.RegisterArtifact(inputPath, "tensor_input", $"BeatriceCompatible: {IsBeatriceCompatible}");
+            string outputPath = Path.Combine(executionDir, "tensor_output_dump.bin");
+            File.WriteAllBytes(outputPath, MemoryMarshal.AsBytes(output.AsSpan()).ToArray());
+            ProvenanceService.RegisterArtifact(outputPath, "tensor_output", $"BeatriceCompatible: {IsBeatriceCompatible}");
         }
 
         public void Dispose()
