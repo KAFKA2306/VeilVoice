@@ -1,83 +1,40 @@
-# VEILVOICE
+# CONTRACT UPDATE
 
-# ZERO-TRUST EXECUTABLE DELIVERY CONTRACT
+# MODEL RESOLUTION & SPEAKER PROFILE SPECIFICATION
 
-# VERSION 3.0
+# ADDENDUM FOR VEILVOICE CONTRACT v3.1
 
-本契約は、
-「VeilVoice」
-の完成定義、検証定義、証拠定義、禁止事項、納入条件を規定する。
+本追補契約は、
+VeilVoice における：
 
-本契約は：
+* Beatrice model management
+* speaker profile handling
+* model path resolution
+* compatible speaker verification
 
-* 善意
-* 自己申告
-* コードレビュー
-* スクリーンショット説明
-* LLM説明
-
-を信用しない。
-
-本契約は：
-
-「偽装耐性を持つ機械検証」
-
-のみを信用する。
+を規定する。
 
 ---
 
-# SECTION 0
+# SECTION 25
 
-# CORE PHILOSOPHY
+# ENGINE / MODEL SEPARATION
 
-## PRINCIPLE-001
+## RULE-ENGINE-001
 
-LLMは信用されない。
+Engine と Model を分離定義する。
 
-## PRINCIPLE-002
+Engine:
+推論実行基盤。
 
-開発者自己申告は信用されない。
-
-## PRINCIPLE-003
-
-artifactを生成する主体は、
-PASS判定権限を持たない。
-
-## PRINCIPLE-004
-
-PASS判定主体は、
-artifactを書き換えられない。
-
-## PRINCIPLE-005
-
-「見た目上それっぽい」は無効。
-
-## PRINCIPLE-006
-
-自己申告manifestは禁止。
-
-## PRINCIPLE-007
-
-Mock/Fake/Stub/Simulationは、
-本番系へ存在した時点でFAIL。
+Model:
+音声人格・speaker profile。
 
 ---
 
-# SECTION 1
+## RULE-ENGINE-002
 
-# PRODUCT DEFINITION
-
-VeilVoice:
-Beatrice inference engine を使用し、
-Windows 11 上で
-リアルタイム音声変換を行う
-ローカルnative voice conversion application。
-
----
-
-# SECTION 2
-
-# MANDATORY ENGINE
+Engine は Beatrice mandatory。
 
 許可：
 
@@ -89,556 +46,297 @@ Windows 11 上で
 
 * RVC substitution
 * OpenVoice substitution
-* cloud inference
-* remote inference
-* API fallback
-* DSP-only fake conversion
-* prerecorded playback
+* external API fallback
 
 ---
 
-# SECTION 3
+# SECTION 26
 
-# TARGET ENVIRONMENT
+# MODEL RESOLUTION SYSTEM
 
-OS:
-
-* Windows 11 24H2 x64
-
-Input:
-
-* FIFINE USB microphone
-
-Output:
-
-* VeilVoiceOut
-
-Apps:
-
-* Discord Stable
-* VRChat
-* OBS Studio
-
----
-
-# SECTION 4
-
-# ZERO TRUST RULES
-
-## RULE-001
-
-artifact生成とPASS判定を分離する。
-
-## RULE-002
-
-artifact生成者は、
-PASSを書き込めない。
-
-## RULE-003
-
-PASS判定者は、
-artifact変更権限を持たない。
-
-## RULE-004
-
-すべてのartifactは：
-
-* SHA256
-* timestamp
-* machine_id
-* git_commit
-* os_version
-
-必須。
-
-## RULE-005
-
-hash不一致時、
-即FAIL。
-
----
-
-# SECTION 5
-
-# FORBIDDEN IMPLEMENTATIONS
-
-以下が存在した時点でFAIL：
-
-* MockVeilVoiceProvider
-* FakeInferenceProvider
-* DummyInferenceProvider
-* SimulationProvider
-* modules.Add(...)
-* manual manifest editing
-* hardcoded PASS
-* hardcoded module detection
-
----
-
-# SECTION 6
-
-# BINARY INTEGRITY GUARANTEE
-
-## TEST-BINARY-001
+## TEST-MODEL-RESOLUTION-001
 
 Requirement:
-本番バイナリにMock/Fake/Stub存在禁止。
-
-Test Method:
-
-```text id="pn1o6u"
-binary_inspector.exe --scan forbidden_symbols
-```
-
-Forbidden Symbols:
-
-* Mock
-* Fake
-* Stub
-* Dummy
-* Simulation
-
-Artifacts:
-
-* binary_symbol_report.json
-* binary_hashes.sha256
-
-PASS:
-
-forbidden symbol count == 0
-
-FAIL:
-
-count > 0
-
----
-
-# SECTION 7
-
-# REAL ENGINE EXECUTION GUARANTEE
-
-## TEST-ENGINE-001
-
-Requirement:
-Beatrice ONNX/Torch 推論実行。
+モデルpath固定禁止。
 
 禁止：
-自己申告manifest。
 
-Test Method:
-
-```text id="wjlwmv"
-acceptance_runner.exe --test real_inference
+```text id="3tb6o7"
+models/beatrice_v2.onnx
 ```
 
-Artifacts:
+固定依存。
 
-* model_hash_manifest.json
-* inference_session_log.txt
-* tensor_input_dump.bin
-* tensor_output_dump.bin
-* inference_timing.csv
-* processed_output.wav
+---
+
+## TEST-MODEL-RESOLUTION-002
+
+Requirement:
+以下path対応。
 
 PASS条件：
 
-* ONNX session created
-* model hash valid
-* tensor output exists
-* realtime inference executed
-
-FAIL:
-
-* model missing
-* fake output
-* static prerecorded output
-* inference bypass
-
-UNVERIFIED:
-
-* session creation failed
-
----
-
-# SECTION 8
-
-# MODULE DETECTION GUARANTEE
-
-## TEST-MODULE-001
-
-Requirement:
-loaded_modules.txt はOS列挙結果のみ。
-
-禁止：
-手動生成。
-
-Test Method:
-
-Windows API:
-
-* EnumProcessModules
-* ETW
-* Process Explorer compatible dump
+* relative path
+* absolute path
+* UTF-8 path
+* Japanese path
+* spaces in path
+* external drive path
 
 Artifacts:
 
-* loaded_modules_raw.txt
-* module_enumerator_log.txt
-
-PASS:
-
-* actual loaded modules present
-* enumeration API verified
+* model_resolution_log.txt
+* model_path_test.json
 
 FAIL:
 
-* manually generated file
-* modules.Add detected
+* ASCII only
+* fixed directory dependency
+* startup crash on UTF-8 path
 
 ---
 
-# SECTION 9
+# SECTION 27
 
-# OFFLINE GUARANTEE
+# MODEL MANIFEST SYSTEM
 
-## TEST-OFFLINE-001
-
-Requirement:
-完全offline動作。
-
-Artifacts:
-
-* firewall_trace.json
-* network_access_log.txt
-* offline_boot_log.txt
-
-PASS:
-
-* inference operational
-* no outbound dependency
-
-FAIL:
-
-* cloud auth
-* remote inference
-
----
-
-# SECTION 10
-
-# CPU REALTIME GUARANTEE
-
-## TEST-CPU-001
-
-Environment:
-Ryzen 7 5800X
+## TEST-MODEL-MANIFEST-001
 
 Requirement:
-GPU無し realtime。
+全モデルは manifest 管理。
 
-Artifacts:
+Required Manifest Format:
 
-* realtime_factor.json
-* cpu_usage.csv
-
-PASS:
-
-* realtime_factor >= 1.0
-* avg_cpu <= 30%
-
-FAIL:
-
-* GPU mandatory
-
----
-
-# SECTION 11
-
-# VIRTUAL AUDIO GUARANTEE
-
-## TEST-VAUDIO-001
-
-Requirement:
-独自VeilVoiceOut endpoint。
-
-禁止：
-
-* VoiceMeeter dependency
-* VB-CABLE dependency
-
-Artifacts:
-
-* endpoint_provider.json
-* endpoint_guid_report.json
-* driver_stack_dump.txt
-
-PASS:
-
-* endpoint stable
-* GUID persistent
-
-FAIL:
-
-* external dependency mandatory
-
----
-
-# SECTION 12
-
-# AUDIO GRAPH GUARANTEE
-
-## TEST-GRAPH-001
-
-Requirement:
-
-```text id="h92fpv"
-Input PCM
-→ Beatrice
-→ VeilVoiceOut
+```json id="cf8d8l"
+{
+  "model_name": "Tsukuyomi",
+  "engine": "Beatrice",
+  "model_path": "D:/Models/Tsukuyomi/model.onnx",
+  "sample_rate": 48000,
+  "speaker_id": "tsukuyomi",
+  "sha256": "...",
+  "compatible_engine_versions": [
+    "Beatrice v2"
+  ]
+}
 ```
 
-のみ成立。
-
 Artifacts:
 
-* audio_graph.json
-* pipeline_trace.log
+* model_manifest.json
+* model_hash_manifest.json
 
 FAIL:
 
-* raw passthrough
-* bypass route
+* raw path only
+* unidentified model
+* no hash verification
 
 ---
 
-# SECTION 13
+# SECTION 28
 
-# RAW VOICE LEAK PREVENTION
+# SPEAKER PROFILE SYSTEM
 
-## TEST-PRIVACY-001
-
-Artifacts:
-
-* raw_input.wav
-* processed_output.wav
-* muted_output.wav
-* correlation_metrics.json
-
-PASS:
-
-* processed voice only
-* mute outputs silence
-
-FAIL:
-
-* raw mic audible
-
----
-
-# SECTION 14
-
-# DISCORD GUARANTEE
-
-## TEST-DISCORD-001
-
-Artifacts:
-
-* discord_capture.png
-* discord_meter_capture.png
-
-PASS:
-
-* VeilVoiceOut selectable
-* meter active
-
-FAIL:
-
-* restart required
-* endpoint invisible
-
----
-
-# SECTION 15
-
-# VRCHAT GUARANTEE
-
-## TEST-VRCHAT-001
-
-Artifacts:
-
-* vrchat_capture.png
-* vrchat_audio_log.txt
-
-FAIL:
-
-* mic unavailable
-
----
-
-# SECTION 16
-
-# LONGRUN STABILITY
-
-## TEST-STABILITY-001
+## TEST-SPEAKER-001
 
 Requirement:
-3時間動作。
+speaker profile selectable。
+
+PASS:
+
+* runtime speaker switching possible
+* profile metadata visible
 
 Artifacts:
 
-* memory_metrics.csv
-* dropout_log.txt
+* speaker_profiles.json
+* runtime_switch_log.txt
 
 FAIL:
 
-* freeze
-* leak
-* unrecovered dropout
+* hardcoded single speaker
+* rebuild required for speaker change
 
 ---
 
-# SECTION 17
+# SECTION 29
 
-# CRASH SAFETY
+# REFERENCE COMPATIBLE MODEL
 
-## TEST-CRASH-001
+## TEST-REFERENCE-001
+
+Requirement:
+つくよみちゃん compatible reference model supported。
+
+Definition:
+
+Reference speaker:
+Tsukuyomi
+
+Requirement:
+
+* official compatible manifest
+* runtime compatibility verified
+* inference success verified
 
 Artifacts:
 
-* crash_dump.dmp
-* endpoint_post_crash.json
+* tsukuyomi_validation_log.txt
+* reference_model_hash.json
+* processed_tsukuyomi_output.wav
 
 FAIL:
 
-* zombie endpoint
-* audio service corruption
+* model incompatible
+* runtime crash
+* invalid sample rate
 
 ---
 
-# SECTION 18
+# SECTION 30
 
-# DRIVER SIGNING
+# USER MODEL SUPPORT
 
-## TEST-DRIVER-001
+## TEST-USERMODEL-001
+
+Requirement:
+ユーザーモデル追加可能。
+
+PASS:
+
+* model hot add
+* manifest recognition
+* runtime load success
 
 Artifacts:
 
-* signtool_verify.txt
+* user_model_scan_log.txt
+* runtime_model_load_log.txt
 
 FAIL:
 
-* unsigned driver
-* test mode dependency
+* rebuild required
+* app restart mandatory
 
 ---
 
-# SECTION 19
+# SECTION 31
 
-# CONFIG PERSISTENCE
+# MODEL HASH VERIFICATION
 
-## TEST-CONFIG-001
+## TEST-HASH-001
+
+Requirement:
+モデルSHA256検証 mandatory。
+
+PASS:
+
+* startup hash verification success
 
 Artifacts:
 
-* config_before.json
-* config_after.json
+* model_hash_report.json
 
 FAIL:
 
-* settings reset
+* hash mismatch ignored
+* unsigned model silently accepted
 
 ---
 
-# SECTION 20
+# SECTION 32
 
-# UNINSTALL SAFETY
+# ENGINE COMPATIBILITY VALIDATION
 
-## TEST-UNINSTALL-001
+## TEST-COMPAT-001
+
+Requirement:
+manifest と engine compatibility 検証。
+
+PASS:
+
+* engine version compatible
+* runtime validation success
+
+FAIL:
+
+* incompatible runtime accepted
+* invalid tensor shape accepted
 
 Artifacts:
 
-* leftover_files.txt
-* registry_diff.json
+* compatibility_validation_log.txt
+* tensor_shape_validation.json
+
+---
+
+# SECTION 33
+
+# HOT RELOAD SYSTEM
+
+## TEST-HOTRELOAD-001
+
+Requirement:
+speaker profile runtime switching。
+
+PASS:
+
+* runtime model switch success
+* no app restart required
+
+Artifacts:
+
+* hotswap_log.txt
+* model_transition_metrics.json
 
 FAIL:
 
-* orphan driver
-* orphan endpoint
+* app restart mandatory
+* audio graph corruption
 
 ---
 
-# SECTION 21
+# SECTION 34
 
-# ACCEPTANCE AUTHORITY
+# MODEL SECURITY RULES
 
-完成判定主体：
+## RULE-SECURITY-001
 
-* acceptance_runner.exe
-* CI pipeline
-* binary inspector
-* human artifact review
+禁止：
 
-LLMは禁止：
-
-* PASS宣言
-* artifact生成
-* manifest記述
-* completion宣言
+* silent remote model download
+* hidden model replacement
+* unsigned runtime model swap
 
 ---
 
-# SECTION 22
+## RULE-SECURITY-002
 
-# DELIVERY BLOCKERS
+すべてのモデル変更は：
 
-以下成立時、
-納入禁止：
+* UI visible
+* logged
+* hash recorded
 
-* FAIL >= 1
-* UNVERIFIED >= 1
-* hash mismatch
-* reproducibility failure
-* missing artifact
+mandatory。
 
 ---
 
-# SECTION 23
+# SECTION 35
 
-# FINAL DELIVERY PACKAGE
+# UPDATED DEFINITION OF COMPLETE
 
-納入物：
+以下成立時のみ：
 
-* VeilVoiceInstaller.exe
-* acceptance_runner.exe
-* binary_inspector.exe
-* acceptance_report.html
-* all artifacts
-* all hashes
-* all logs
-* CI bundle
-* reproducibility manifest
-* model hash manifest
-
----
-
-# SECTION 24
-
-# DEFINITION OF COMPLETE
-
-以下すべて成立時のみ：
-
-* FAIL == 0
-* UNVERIFIED == 0
 * Beatrice verified
-* realtime verified
-* offline verified
-* Discord verified
-* VRChat verified
-* raw leak absent
-* artifact integrity valid
-* binary integrity valid
+* Tsukuyomi reference verified
+* user model support verified
+* model hash validation verified
+* runtime speaker switching verified
+* UTF-8 path compatibility verified
 
-その時のみ：
+成立した場合のみ：
 
 「VeilVoice 完成」
 
