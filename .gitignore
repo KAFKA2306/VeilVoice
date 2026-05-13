@@ -1,4 +1,31 @@
-results/
-artifacts/
+# Zero-Fat Ignoring: Keep Repo Pure
+
+# Build & Runtime Output
 bin/
 obj/
+publish/
+
+# Dynamic Artifacts & Provenance (SECTION 5/10 Evidence)
+artifacts/
+provenance/
+results/
+*.log
+*.sha256
+acceptance_report.html
+binary_symbol_report.json
+
+# Test Fixtures (Contract SECTION 5)
+fixture_*.wav
+*_output.wav
+
+# IDE & User Specific
+.vs/
+.vscode/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# System & OS
+[Tt]humbs.db
+.DS_Store
